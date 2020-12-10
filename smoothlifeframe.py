@@ -57,6 +57,7 @@ class SmoothLifeFrame(ttk.Frame):
         
         # Create the canvas object.
         self._create_canvas()
+        self._create_lines()
         
         # Create the button panel on the side.
         self._create_button_panel()
@@ -66,20 +67,21 @@ class SmoothLifeFrame(ttk.Frame):
                   sticky=(tkinter.N, tkinter.S, tkinter.E, tkinter.W))
 
     #-------------------------------------------------------------------------
-    # Private methods for creating components of the GUI.
+    # Private methods for creating components of the GUI and drawings within
+    # them.
     #-------------------------------------------------------------------------
 
     def _create_canvas(self):
-        self.canvas_frame = tkinter.Frame(master=self)
+        self.canvas_frame = ttk.Frame(master=self)
         self.canvas = tkinter.Canvas(master=self.canvas_frame,
                                      width=DEFAULT_CANVAS_WIDTH,
                                      height=DEFAULT_CANVAS_HEIGHT,
-                                     background='red')
+                                     background='white')
 
         self.canvas.grid(row=0, column=0,
                          sticky=(tkinter.N, tkinter.S, tkinter.E, tkinter.W))
         self.canvas_frame.grid(row=0, column=0)
-        
+
     def _create_button_panel(self):
         # Create the panel itself.
         self.button_frame = ttk.Frame(master=self,
@@ -102,12 +104,47 @@ class SmoothLifeFrame(ttk.Frame):
         self.randomize_button.grid(row=3, column=0)
         self.button_frame.grid(row=0, column=1, sticky=(tkinter.E,))
 
+    def _create_lines(self):
+        width = float(self.canvas.cget('width'))
+        height = float(self.canvas.cget('width'))
+        
+        print('width, height = {0}, {1}'.format(width, height))
+        
+        # Create the vertical lines.
+        py0 = 0
+        pyn = height
+        
+        # The "slope" for the x transformation.
+        m = width / (self.xn - self.x0)
+        
+        for i in range(1, self.numx - 1):
+            px = m * i * self.hx
+            
+            self.canvas.create_line(px, py0, px, pyn, fill='#000000', width=1, tag='vline')
+
+        # Create the vertical lines.
+        px0 = 0
+        pxn = width
+
+        # The "slope" for the y transformation.
+        m = -height / (self.yn - self.y0)
+        
+        for j in range(1, self.numy - 1):
+            py = m * j * self.hy + height
+            
+            self.canvas.create_line(px0, py, pxn, py, fill='#000000', width=1, tag='hline')
+
+    def _create_cells(self):
+        pass
+
     #-------------------------------------------------------------------------
     # Class methods to add and remove items from the canvas.
     #-------------------------------------------------------------------------
     
     def clear_all(self):
-        self.delete('')
+        self.delete('vline')
+        self.delete('hline')
+        self.delete('cell')
         
     def clear_cells(self):
         self.canvas.delete('cell')
@@ -115,7 +152,34 @@ class SmoothLifeFrame(ttk.Frame):
     #-------------------------------------------------------------------------
     # Class methods for event bindings.
     #-------------------------------------------------------------------------
+    
+    def on_resize(self, event):
+        pass
 
+    def on_left_click(self, event):
+        pass
+
+    def on_center_click(self, event):
+        pass
+
+    def on_right_click(self, event):
+        pass
+
+    def on_key_press(self, event):
+        pass
+
+    def on_button_press(self, event):
+        pass
+
+    #-------------------------------------------------------------------------
+    # Class methods for updating the grid at each step.
+    #-------------------------------------------------------------------------
+
+    def step(self):
+        pass
+
+    def update(self):
+        pass
 
 if __name__ == '__main__':
     x0 = 0
