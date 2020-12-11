@@ -59,7 +59,7 @@ class Integrator:
 
         return outer_antialiasing_ind
 
-    def fast_integrate(self, c, r0, r1, b, F):
+    def integrate(self, c, r0, r1, b, F):
         # Compute a placeholder for all of the squared distances from the
         # center c.
         self.Z = (self.X - c[0])**2 + (self.Y - c[1])**2
@@ -110,24 +110,34 @@ if __name__ == '__main__':
     r1 = 3.0
     b = 0.25
 
-    for M, N in [(1080, 1920)]:
-        # Create the grid.
-        x = np.linspace(x0, xn, num=M-1, endpoint=False) + (xn - x0) / (2 * (M - 1))
-        y = np.linspace(y0, yn, num=N-1, endpoint=False) + (yn - y0) / (2 * (N - 1))
-        X, Y = np.meshgrid(x, y)
+    # The dimenions, if each cell was a pixel.
+    M = 40
+    N = 40
+    
+    # The number of times we have to compute an integral (one for each cell).
+    nruns = M * N
+        
+    # Create the grid.
+    x = np.linspace(x0, xn, num=M-1, endpoint=False) + (xn - x0) / (2 * (M - 1))
+    y = np.linspace(y0, yn, num=N-1, endpoint=False) + (yn - y0) / (2 * (N - 1))
+    X, Y = np.meshgrid(x, y)
 
-        # Create an integrator object.
-        itgr = Integrator(X, Y)
+    # A function whose discrete values are given at the midpoint of each cell.
+    F = np.ones(X.shape)
+    
+    # Create an integrator object.
+    itgr = Integrator(X, Y)
 
-        # A function whose discrete values are given at the midpoint of each cell.
-        F = np.ones(X.shape)
+    for run in range(nruns):
+        print('Iteration {0:4d} of {1:4d}\r'.format(run + 1, nruns), end='')
         
         # Compute the approximate integral of F over the region.
-        integral = itgr.fast_integrate(c, r0, r1, b, F)
+        integral = itgr.integrate(c, r0, r1, b, F)
         
         # Display the integral's approximate value to the user.
-        print('Approximate integral over grid of size {0:d}: {1:f}'.format((N-1)**2, integral[0]))
+        #print('Approximate integral over grid of size {0:d}: {1:f}'.format((N-1)**2, integral[0]))
         
         # For fun, pump out the exact answer.
-        print('Exact integral: {0:f}'.format(1))
-        print('')
+        #print('Exact integral: {0:f}'.format(1))
+        #print('')
+    print('')
