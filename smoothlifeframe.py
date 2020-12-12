@@ -7,11 +7,12 @@ import sys
 import tkinter
 from tkinter import ttk
 import numpy as np
+import integrator as igtr
 
-DEFAULT_CANVAS_WIDTH = 400
-DEFAULT_CANVAS_HEIGHT = 400
+DEFAULT_CANVAS_WIDTH = 800
+DEFAULT_CANVAS_HEIGHT = 800
 DEFAULT_BUTTON_FRAME_WIDTH = 100
-DEFAULT_BUTTON_FRAME_HEIGHT = 400
+DEFAULT_BUTTON_FRAME_HEIGHT = 800
 
 class SmoothLifeFrame(ttk.Frame):
 
@@ -38,8 +39,21 @@ class SmoothLifeFrame(ttk.Frame):
         self.xn = xn
         self.y0 = y0
         self.yn = yn
-        self.numx = (DEFAULT_CANVAS_WIDTH // 2 + 1) if numx is None else numx
-        self.numy = (DEFAULT_CANVAS_HEIGHT // 2 + 1) if numy is None else numy
+        
+        if numx is None:
+            self.numx = DEFAULT_CANVAS_WIDTH // 10 + 1
+        elif numx % 2 == 0:
+            self.numx = numx + 1
+        else:
+            self.numx = numx
+
+        if numy is None:
+            self.numy = DEFAULT_CANVAS_HEIGHT // 10 + 1
+        elif numy % 2 == 0:
+            self.numy = numy + 1
+        else:
+            self.numy = numy
+
         self.hx = (self.xn - self.x0) / (self.numx - 1)
         self.hy = (self.yn - self.y0) / (self.numy - 1)
         
@@ -58,6 +72,7 @@ class SmoothLifeFrame(ttk.Frame):
         # Create the canvas object.
         self._create_canvas()
         self._create_lines()
+        self._create_cells()
         
         # Create the button panel on the side.
         self._create_button_panel()
@@ -72,7 +87,7 @@ class SmoothLifeFrame(ttk.Frame):
     #-------------------------------------------------------------------------
 
     def _create_canvas(self):
-        self.canvas_frame = ttk.Frame(master=self)
+        self.canvas_frame = ttk.Frame(master=self, padding=(5,5,5,5))
         self.canvas = tkinter.Canvas(master=self.canvas_frame,
                                      width=DEFAULT_CANVAS_WIDTH,
                                      height=DEFAULT_CANVAS_HEIGHT,
@@ -81,10 +96,12 @@ class SmoothLifeFrame(ttk.Frame):
         self.canvas.grid(row=0, column=0,
                          sticky=(tkinter.N, tkinter.S, tkinter.E, tkinter.W))
         self.canvas_frame.grid(row=0, column=0)
+        
+        print(self.canvas_frame.config())
 
     def _create_button_panel(self):
         # Create the panel itself.
-        self.button_frame = ttk.Frame(master=self,
+        self.button_frame = ttk.Frame(master=self, padding=(5,5,5,5),
                                       width=DEFAULT_BUTTON_FRAME_WIDTH,
                                       height=DEFAULT_BUTTON_FRAME_HEIGHT)
 
@@ -106,10 +123,8 @@ class SmoothLifeFrame(ttk.Frame):
 
     def _create_lines(self):
         width = float(self.canvas.cget('width'))
-        height = float(self.canvas.cget('width'))
-        
-        print('width, height = {0}, {1}'.format(width, height))
-        
+        height = float(self.canvas.cget('height'))
+
         # Create the vertical lines.
         py0 = 0
         pyn = height
@@ -134,8 +149,26 @@ class SmoothLifeFrame(ttk.Frame):
             
             self.canvas.create_line(px0, py, pxn, py, fill='#000000', width=1, tag='hline')
 
+    def _create_cell(self, x0, y0, w, h, fill='red', tag='cell', outline=None):
+        return self.canvas.create_rectangle(x0, y0, x0 + w, y0 + h, fill=fill, tag=tag, outline=outline)
+
     def _create_cells(self):
-        pass
+        self.cells = []
+        
+        dw = float(self.canvas.cget('width')) / (self.numx - 1)
+        dh = float(self.canvas.cget('width')) / (self.numy - 1)
+        
+        for j in range(self.numy - 2, -1, -1):
+            py0 = j * dh
+
+            for i in range(self.numx - 1):
+                px0 = i * dw
+                
+                cellid = self._create_cell(px0, py0, dw, dh, fill='red', tag='cell')
+                self.cells.append(cellid)
+    
+    def _change_cell(self, index, fill='green'):
+        self.canvas.itemconfig(self.cells[index], fill=fill)
 
     #-------------------------------------------------------------------------
     # Class methods to add and remove items from the canvas.
@@ -186,10 +219,8 @@ if __name__ == '__main__':
     xn = 10
     y0 = 0
     yn = 10
-    numx = 80
-    numy = 80
-    width = 800
-    height = 800
+    numx = 40
+    numy = 40
     r0 = 1
     r1 = 2
 
