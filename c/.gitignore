@@ -1,3 +1,4 @@
-# Ignore library and object file folders.
+# Ignore library, object, and executable files.
 lib
 obj
+bin
