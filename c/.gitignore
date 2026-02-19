@@ -1,0 +1,3 @@
+# Ignore library and object file folders.
+lib
+obj
