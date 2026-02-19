@@ -60,6 +60,15 @@ $(object_dir)/benchmark_utils.o: $(src_dir)/benchmark_utils.c $(include_dir)/ben
 $(object_dir)/transitionfunction.o: $(src_dir)/transitionfunction.c $(include_dir)/transitionfunction.h
 	$(cc) -c $< $(ccflags) -o $@ 
 
+$(object_dir):
+	mkdir -p $(object_dir)
+
+$(bin_dir):
+	mkdir -p $(bin_dir)
+
+$(lib_dir):
+	mkdir -p $(lib_dir)
+
 clean:
 	rm -rf $(object_dir)/* $(bin_dir)/* $(lib_dir)/*
 
