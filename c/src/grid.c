@@ -1026,11 +1026,3 @@ void grid_print_indices(const struct grid_s *grid)
 		printf("i = %4d, j = %4d\n", i, j);
 	}
 }
-
-
-
-
-
-
-
-
