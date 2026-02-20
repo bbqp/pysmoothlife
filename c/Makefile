@@ -23,7 +23,7 @@ benchmark_obj:=$(benchmark_obj:%=$(object_dir)/%)
 library_obj:=$(library_obj:%=$(object_dir)/%)
 
 cc=gcc
-ccflags=-fPIC -O2 -march=native -I$(include_dir) -DUSE_INTRINSICS -DUSE_INDICES -DCONTIGUOUS_LOOP
+ccflags=-fPIC -O2 -march=native -I$(include_dir) -lm -DUSE_INTRINSICS -DUSE_INDICES -DCONTIGUOUS_LOOP
 ldflags=
 
 so_ccflags=-O2 -march=native -I$(include_dir) -DUSE_INTRINSICS -DUSE_INDICES -DCONTIGUOUS_LOOP -fPIC
