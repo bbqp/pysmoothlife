@@ -1,0 +1,3 @@
+[submodule "intrinsics_utils"]
+	path = intrinsics_utils
+	url = https://github.com/bbqp/intrinsics_utils
