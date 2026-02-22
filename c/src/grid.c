@@ -636,7 +636,7 @@ void grid_compute_integral(struct grid_s *grid, char which, float *integral, flo
 		n = grid->cdiamo * grid->cdiamo;
 	}
 	
-	sum = fdot_indexed_avx2(data, indicesk, weights, n);
+	sum = _mm256_fdot_indexed(data, indicesk, weights, n);
 #else
 	if (which == 'i') {
 		data = grid->data + grid->cstart;
@@ -648,7 +648,7 @@ void grid_compute_integral(struct grid_s *grid, char which, float *integral, flo
 		n = grid->cdiamo * grid->cdiamo;
 	}
 	
-	sum = fdot_avx2(data, weights, n);
+	sum = _mm256_fdot(data, weights, n);
 #endif
 #else
 #ifdef USE_INDICES
