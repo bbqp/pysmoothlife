@@ -6,7 +6,7 @@
 #include <string.h>
 
 #ifdef USE_INTRINSICS
-#include "intrinsics_utils.h"
+#include "../../intrinsics_utils/include/intrinsics_utils.h"
 #include <immintrin.h>
 #endif
 
