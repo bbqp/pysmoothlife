@@ -249,7 +249,9 @@ void grid_get_extreme_points_on_line(struct grid_s *grid, float cx, float cy, ch
 	// Compute the incremental differences in the coordinates.
 	float dx = grid->dx;
 	float dy = grid->dy;
-	
+
+    // Critical points t for the parameterized sides of each cell, along with
+    // the corresponding distances.	
 	float tc[3];
 	float distvals[3];
 	
@@ -309,6 +311,7 @@ void grid_get_extreme_points_on_line(struct grid_s *grid, float cx, float cy, ch
 		distvals[k] = xdist * xdist + ydist * ydist;
 	}
 
+    // Grab the indices of the minimum and maximum critical values.
 	grid_get_extreme_indices(distvals, 3, &minidx, &maxidx);
 	
 	xcrit[0] = dx * tc[minidx] + x0;
@@ -334,7 +337,7 @@ void grid_get_extreme_indices(float *values, int length, int *minindex, int *max
 			minval = values[i];
 		}
 		
-		if (maxval <  values[i]) {
+		if (maxval < values[i]) {
 			maxidx = i;
 			maxval = values[i];
 		}
@@ -657,37 +660,29 @@ void grid_compute_integral(struct grid_s *grid, char which, float *integral, flo
 		data = grid->data + grid->fstart;
 		weights = grid->weights + grid->cstart;
 		n = grid->cdiami * grid->cdiami;
-
-		for (i = 0; i < n; i++) {
-			sum += data[indicesk[i]] * weights[i];
-		}
 	} else {
 		indicesk = grid->domain_indices + grid->aindexk_start;
 		data = grid->data + grid->fstart;
 		weights = grid->weights + grid->astart;
 		n = grid->cdiamo * grid->cdiamo;
+	}
 
-		for (i = 0; i < n; i++) {
-			sum += data[indicesk[i]] * weights[i];
-		}
+	for (i = 0; i < n; i++) {
+		sum += data[indicesk[i]] * weights[i];
 	}
 #else
 	if (which == 'i') {
 		data = grid->data + grid->cstart;
 		weights = grid->weights + grid->cstart;
 		n = grid->cdiami * grid->cdiami;
-
-		for (i = 0; i < n; i++) {
-			sum += data[i] * weights[i];
-		}
 	} else {
 		data = grid->data + grid->astart;
 		weights = grid->weights + grid->astart;
 		n = grid->cdiamo * grid->cdiamo;
+	}
 
-		for (i = 0; i < n; i++) {
-			sum += data[i] * weights[i];
-		}
+	for (i = 0; i < n; i++) {
+		sum += data[i] * weights[i];
 	}
 #endif
 #endif
