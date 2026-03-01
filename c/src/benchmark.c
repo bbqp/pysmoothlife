@@ -103,7 +103,7 @@ void benchmark(int ntrials, int size_min_index, int size_max_index, int step, in
 int main(int argc, char *argv[])
 {
 	int ntrials = 50;
-	int size_min_index = 8, size_max_index = 8;
+	int size_min_index = 4, size_max_index = 9;
 	int step = 1;
 	int base = 2;
 	int offset = 1;
