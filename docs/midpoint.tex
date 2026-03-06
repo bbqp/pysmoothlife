@@ -1,0 +1,453 @@
+\documentclass{article}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+
+\begin{document}
+    
+\section*{Introduction}
+
+The purpose of this document is to explore the trade-off between the size of an antialising region
+and the approximate accuracy of an integral of a state function $f(\mathbf{x}, t)$ which we assume
+to be continuously differentiable in $(\mathbf{x}, t)$.
+\\
+\\
+In Smoothlife, we discretize a domain with periodic boundaries using rectangles of some prescribed width and height. To this end, we are given the value of a state function in each cell, i.e. an approximation of some state function at the midpoint of each cell. In practice, this means that we can take the circular (and annular) regions of integration to be centered at the midpoint of any given cell in the grid.
+    
+\section{Motivation: Weight functions in 1D}
+
+We begin by looking at a 1D analogue of the operations we perform in Smoothlife, specifically a function defined on $D := [0, r]$ for some $r > 0$. In addition, define an antialiasing parameter $b > 0$. Then we are tasked, for some "smooth-enough" state function $f : \mathbb{R} \rightarrow [0, \infty)$
+\[
+    \int_0^r f(x) \: dx
+\]
+
+\noindent
+In Smoothlife, however, we extend $D$ to $D_b = [0, r + b/2]$. In addition, let
+\[
+    \omega_b(x)=
+    \begin{cases}
+        1, & 0 \leq x \leq r - \dfrac{b}{2} \\
+        \dfrac{r + b/2 - x}{b} & x > r - \dfrac{b}{2}
+    \end{cases}
+\]
+
+\noindent
+Then the integral approximation to $f$ on $D$ is given by
+\[
+    \int_{D_b} f(x) \omega_b(x) \: dx
+\]
+
+\noindent
+This is motivated by the need to approximate the circular nature of the domain using an antialiasing region of width $b > 0$.
+\\
+\\
+We can then define the error on $D_b$ as
+\[
+    E_b := \int_{D_b} f(x) (1 - \omega_b(x)) \: dx
+    =
+    \int_{r-b/2}^{r+b/2} f(x)
+    \dfrac{r + b/2 - x}{b} \: dx,
+\]
+
+\noindent
+which shows that the error is amplified in the antialiasing region. This formulation introduces a couple of issues, one of which is that we are approximating the integral of a nonsmooth integrand (really, an integrand with a nonsmooth weight) using a quadrature rule (the midpoint rule) where we cannot rely on the smoothness of the integrand.
+\\
+\\
+What we hope to show is that we need to find a trade-off between the discretization and the size of the anti-aliasing region. Our conjectures are as follows:
+
+\begin{enumerate}
+    \item If a node of the partition of $D_b$ falls on $x = r$, then the global order of approximation could decrease the order of convergence from quadratic to linear.
+    \item If $b \in (x_j, x_{j+1})$ for some $j = 0, 1, ..., n-1$, then the error in the approximation will be a function of the magnitude of $b$ and and the distance to $x = r$.    
+\end{enumerate}
+
+\noindent
+In the next sections, we will explore the above conjectures in the case $f(x) \equiv 1$, saving the general case for later.
+
+\newpage
+
+\section{The case of $f(x) \equiv 1$}
+\subsection{A subinterval containing $x = r - b/2$}
+
+Consider a partition $P_n$ of $D_b$ with $0 = x_0 < x_1 < \cdots < x_n = r + b/2$, and suppose there is an integer $j$, $0 \leq j \leq n - 1$ such that $r \in (x_j, x_{j+1})$. In addition, let $I_i = [x_i, x_{i+1}]$ for $i = 0, 1, \ldots, n-1$, let $\Delta x_i = x_{i+1} - x_i$ for $i = 0, 1, \ldots, n-1$, and let $s = \dfrac{r - b/2 - x_j}{\Delta x_j}$. Then we know that the exact integral under this region is given by
+\[
+    \begin{array}{rcl}
+    A_j &=& \displaystyle
+            \int_{x_j}^{x_{j+1}} \omega_b(x) \: dx \\
+        & &	\\
+        &=& \displaystyle
+            \int_{x_j}^{r-b/2} 1 \: dx +
+            \int_{r-b/2}^{x_{j+1}} \frac{r+b/2-x}{b} \: dx \\
+        & &	\\
+        &=& \displaystyle
+            (r - b/2 - x_j) +
+            \frac{1}{2}
+            \left( 1 + \dfrac{r + b/2 - x_{j+1}}{b} \right)
+            (x_{j+1} - (r - b/2)) \\
+        & &	\\
+        &=& \displaystyle
+            s\Delta x_j +
+            \frac{1}{2}
+            \left( 1 + \dfrac{r + b/2 - x_{j+1}}{b} \right)
+            (1 - s) \Delta x_j \\
+        & &	\\
+        &=& \displaystyle
+            s\Delta x_j +
+            \frac{1}{2}
+            \left(
+                \frac{r + b/2 - (r - b/2)}{b} +
+                \frac{r + b/2 - x_{j+1}}{b}
+            \right)
+            (1 - s) \Delta x_j \\
+        & &	\\
+        &=& \displaystyle
+            s\Delta x_j +
+            \left(
+                \frac{
+                    r + b/2 -
+                    \frac{x_{j+1} + (r - b/2)}{2}
+                }{b}
+            \right)
+            (1 - s) \Delta x_j \\
+    \end{array}
+\]
+
+\noindent
+Due to the equivalence of the midpoint and trapezoidal sums for affine functions, we can write the area under the trapezoidal portion of $\omega_b(x)$ on $(r - b/2, x_{j+1})$ as a midpoint sum (see above). We will be utilizing this later to show the error approximation when the midpoint of the interval $I_j$ is greater than $r - b/2$.
+\\
+\\
+For the remaining subintervals forming $P_n$, the quadrature will be exact due to the midpoint rule being exact for linear functions, meaning the interval $I_j$ will control the error of the approximation. Now let $M_j$ be the midpoint approximation to the desired integral on interval $I_j$, $m_j = \dfrac{x_j + x_{j+1}}{2}$, and $\Delta x_j := x_{j+1} - x_j$. Then we have the following:
+\[
+    M_j := 
+    \begin{cases}
+        \Delta x_j, & m_j \leq r - b/2 \\
+        \dfrac{r + b/2 - m_j}{b} \Delta x_j, & m_j > r - b/2
+    \end{cases}
+\]
+
+\noindent
+By construction, $E_j = 0$ when $x_j = r - b/2$ or $x_{j+1} = r - b/2$ since the midpoint rule is exact strictly on the constant or nonconstant regions of $\omega_b(x)$.
+\\
+\\
+Now let $E_j := A_j - M_j$. On the interval $I_j$, we have
+\[
+    \begin{array}{rcl}
+    E_j &=& \displaystyle
+            \frac{1}{2} \left[
+                1 + \dfrac{r + b/2 - x_{j+1}}{b}
+            \right] (x_{j+1} - (r - b/2)) -
+            (x_{j+1} - (r-b/2)) \\
+        & &	\\
+        &=& \displaystyle
+            \frac{1}{2} \left[
+            1 + \dfrac{r + b/2 - x_{j+1}}{b}
+            \right] (1 - s)\Delta x_j -
+            (1 - s)\Delta x_j \\
+        & &	\\
+        &=& \displaystyle
+            \frac{1}{2} \left[
+                -1 + \dfrac{r + b/2 - x_{j+1}}{b}
+            \right] (1 - s)\Delta x_j \\
+        & &	\\
+        &=& \displaystyle
+            \frac{1}{2} \left[
+            -\frac{r + b/2 - (r - b/2)}{b}
+            +
+            \frac{r + b/2 - x_{j+1}}{b}
+            \right] (1 - s)\Delta x_j \\
+        & &	\\
+        &=& \displaystyle
+            \frac{1}{2} \left[
+                \frac{(r - b/2) - (r + b/2)}{b}
+                +
+                \frac{r + b/2 - x_{j+1}}{b}
+            \right] (1 - s)\Delta x_j \\
+        & &	\\
+        &=& \displaystyle
+            \frac{1}{2} \left[
+                \frac{r - b/2 - x_{j+1}}{b}
+            \right] (1 - s)\Delta x_j \\
+        & &	\\
+        &=& \displaystyle
+            -\frac{1}{2} \left[
+                \frac{x_{j+1} - (r - b/2)}{b}
+            \right] (1 - s)\Delta x_j \\
+        & &	\\
+        &=& \displaystyle
+            -\frac{1}{2b}(1 - s)^2\Delta x_j^2 \\
+    \end{array}
+\]
+
+\noindent
+when $m_j \leq r - b/2$ or $s \geq 1/2$. Indeed, $E_j$ can be interpreted as the signed over-estimation error that comes from approximating the area under $\omega_b(x)$ on $(r - b/2, x_{j+1}]$ by use of the midpoint rule on $I_j$.
+\\
+\\
+Now suppose that $m_j > r - b/2$ ($s < 1/2$), and recall that the midpoint rule and the trapezoidal rule are equivalent for affine functions. In addition, note that we can split the midpoint rule using some algebra:
+\[
+    \begin{array}{rcl}
+        M_j &=& \displaystyle
+                \left[
+                    \frac{r + b/2 -
+                        \frac{x_{j+1}+x_j}{2}
+                    }{b}
+                \right]
+                (1 - s)\Delta x_j
+                +
+                \left[
+                    \frac{r + b/2 -
+                        \frac{x_{j+1}+x_j}{2}
+                    }{b}
+                \right]
+                s\Delta x_j \\
+    \end{array}
+\]
+
+\noindent
+The purpose of this is to make easier the computation of the overall error by grouping terms involve $(1 - s) \Delta x_j$ and $s\Delta x_j$. To proceed, let's focus on the term attached to $(1 - s)\Delta x_j$. Then that portion of $E_j = A_j - M_j$ simplifies to 
+
+\[
+\begin{array}{rcl}
+    E_j &=& \displaystyle
+            \left(
+            \frac{
+                r + b/2 -
+                \frac{x_{j+1} + (r - b/2)}{2}
+            }{b}
+            -
+            \frac{
+                r + b/2 -
+                \frac{x_{j+1} + x_j}{2}
+            }{b}
+            \right) (1 - s) \Delta x_j \\
+        & & \\
+        &=& \displaystyle
+            \left(
+            \frac{
+                - \frac{x_{j+1} - (r - b/2)}{2}
+                + \frac{x_{j+1} + x_j}{2}
+            }{b}
+            \right) (1 - s) \Delta x_j \\
+        & & \\
+        &=& \displaystyle
+            \frac{1}{2}
+            \left(
+                \frac{
+                    - x_{j+1} - (r - b/2)
+                    + x_{j+1} + x_j
+                }{b}
+            \right) (1 - s) \Delta x_j \\
+        & & \\
+        &=& \displaystyle
+            \frac{1}{2}
+            \left(
+                \frac{
+                    -(r - b/2) + x_j
+                }{b}
+            \right) (1 - s) \Delta x_j \\
+        & & \\
+        &=& \displaystyle
+            -\frac{1}{2}
+            \left(
+                \frac{
+                    r - b/2 - x_j
+                }{b}
+            \right) (1 - s) \Delta x_j \\
+        & & \\
+        &=& \displaystyle
+            -\frac{1}{2b}
+            s\Delta x_j (1 - s) \Delta x_j \\
+            & & \\
+            &=& \displaystyle
+            -\frac{1}{2b} s(1 - s) \Delta x_j^2
+\end{array}
+\]
+
+\noindent
+Next we tackle the $s\Delta x_j$ term. 
+
+\[
+\begin{array}{rcl}
+    E_j &=& \displaystyle
+            \left(
+                1
+                -
+                \frac{
+                    r + b/2 -
+                    \frac{x_{j+1} + x_j}{2}
+                }{b}
+            \right) s \Delta x_j \\
+        & & \\
+        &=& \displaystyle
+            \left(
+                \frac{
+                    r + b/2 - (r - b/2)
+                    -
+                    (r + b/2)
+                    +
+                    \frac{x_{j+1} + x_j}{2}
+                }{b}
+            \right) s \Delta x_j \\
+        & & \\
+        &=& \displaystyle
+        \frac{1}{2}
+        \left(
+            \frac{
+                -2(r - b/2)
+                +
+                x_{j+1} + x_j
+            }{b}
+        \right) s \Delta x_j \\
+        & & \\
+        &=& \displaystyle
+        -\frac{1}{2}
+        \left(
+            \frac{
+                r - b/2 - x_j
+            }{b}
+        \right) s \Delta x_j
+        +
+        \frac{1}{2}
+        \left(
+            \frac{
+                x_{j+1} - (r - b/2)
+            }{b}
+        \right) s \Delta x_j \\
+        & & \\
+        &=& \displaystyle
+        -\frac{1}{2b} s^2 \Delta x_j^2
+        +
+        \frac{1}{2b} s(1 - s) \Delta x_j^2 \\
+\end{array}
+\]
+
+\noindent
+Combining both results yields
+\[
+    E_j = -\frac{1}{2b} s^2 \Delta x_j^2
+\]
+
+\noindent
+for $m_j > r - b/2$. Combining these results yields
+\[
+    E_j =
+    \begin{cases}
+        -\dfrac{1}{2b} s^2 \Delta x_j^2, & s < 1/2
+        \\ \\
+        -\dfrac{1}{2b} (1-s)^2 \Delta x_j^2, & s \geq 1/2
+    \end{cases}
+\]
+
+\newpage
+
+\subsection{A partition that extends beyond the support of $\omega_b(x)$}
+
+In practice, the domains over which we integrate in smooth life will have to contend with a rectangular grid where some portions of the curves do not perfectly meet at a convenient boundary of a cell. This will especially be common in the case where we have a very fine grid of cells. This leaves us with a few options:
+
+\begin{enumerate}
+    \item Ignore a cell if the midpoint is outside of the domain of integration, even if there is nontrivial overlap of the cell and the interior of the region of integration.
+        \begin{itemize}
+            \item Otherwise, compute the overlap of the interval and deal with the overestimate of the value of the integral.
+        \end{itemize}
+    
+    \item Use Green's theorem to find the centroid of the region where there is overlap with the cell.
+        \begin{itemize}
+            \item In $\mathbb{R}^2$, we'll rely on Green's theorem.  
+        \end{itemize}
+\end{enumerate}
+
+\noindent
+We'll start with the first scenario below, and then take a look at using Green's theorem in 2D. In practice, these calculations just have to be done once on initialization, and then can be re-used since in practice we're just shifting in the values of the state function f.
+
+\subsubsection{The 1D Case}
+
+
+\subsection{The 2D Case}
+
+For a sufficiently smooth vector field $\mathbf{F} = \langle F_1, F_2 \rangle$ and bounded region $A \subset \mathbb{R}^2$ with a boundary $C$ forming a simple closed loop, we have that
+
+\[
+    \begin{array}{rcl}
+    \displaystyle
+    \iint_A
+    \left(
+        \frac{\partial F_2}{\partial x}
+        -
+        \frac{\partial F_1}{\partial y}
+    \right) \: dA
+    &=&
+    \displaystyle 
+    \int_C \mathbf{F} \cdot d\mathbf{s} \\
+    & & \\
+    &=&
+    \displaystyle
+    \int_C
+    F_1(x(t), y(t)) \frac{dx}{dt}
+    +
+    F_2(x(t), y(t)) \frac{dy}{dt} \: dt
+    \end{array}
+\]
+
+\noindent
+for some (possibly piecewise) parameterization of the curve $C$. In practice, we need to compute three quantities: The area of $A$ and the centroid coordinates $\bar{x}$ and $\bar{y}$ via
+
+\[
+\begin{array}{rcl}
+        |A| &=& \displaystyle \iint_A \: dA \\
+            & & \\
+    \bar{x} &=& \displaystyle
+                \frac{1}{|A|} \iint_A x \: dA \\
+            & & \\
+    \bar{y} &=& \displaystyle
+                \frac{1}{|A|} \iint_A y \: dA. \\
+\end{array}
+\]
+
+\noindent
+For each of these computations, we will use the following respective vector fields $\mathbf{F}$:
+
+\[
+\begin{array}{rcl}
+        |A| &\rightarrow&	\displaystyle
+                            \mathbf{F} =
+                            \left\langle
+                                -\frac{y}{2}, \frac{x}{2}
+                            \right\rangle \\
+            & & \\
+    \bar{x} &\rightarrow&	\displaystyle
+                            \mathbf{F} =
+                            \left\langle
+                                0, \frac{x^2}{2}
+                            \right\rangle \\
+            & & \\
+    \bar{y} &\rightarrow&	\displaystyle
+                            \mathbf{F} =
+                            \left\langle
+                                -\frac{y^2}{2}, 0
+                            \right\rangle \\
+\end{array}
+\]
+
+\end{document}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
