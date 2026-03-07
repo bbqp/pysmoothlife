@@ -164,7 +164,7 @@ def convert_pointer_to_array(ptr, dtype, size):
 
 if __name__ == '__main__':
     np.set_printoptions(linewidth=200)
-    libpath = os.path.abspath('.') + os.sep + 'smoothlife.so'
+    libpath = '../c/lib/' + 'libsmoothlife.so'
     slib = ctypes.cdll.LoadLibrary(libpath)
 
     grid = Grid()
@@ -195,5 +195,3 @@ if __name__ == '__main__':
     
     slib.grid_clear(ctypes.byref(grid))
     print_grid(grid)
-    
-    
