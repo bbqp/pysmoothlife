@@ -4,6 +4,9 @@
 \usepackage{amssymb}
 \usepackage{amsfonts}
 \usepackage[margin=1in]{geometry}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.3}
+\usepgfplotslibrary{colormaps}
 
 \begin{document}
     
@@ -32,6 +35,31 @@ In Smoothlife, however, we extend $D$ to $D_b = [0, r + b/2]$. In addition, let
         \dfrac{r + b/2 - x}{b} & x > r - \dfrac{b}{2}
     \end{cases}
 \]
+
+\begin{figure}[h]
+    \centering
+    \begin{tikzpicture}
+        \begin{axis}[
+            title={Weight Function},
+            xlabel={$x$},
+            ylabel={$\omega_b(x)$},
+            xticklabel=\empty,   
+        ]
+            % density of Normal distribution:
+            \addplot [
+                red,
+                domain=0:4,
+                samples=5
+            ]{and(\x>=0, \x<=3) * (1) +
+                and(\x>3, \x<=4) * (4 - \x)};
+            
+            
+            \addplot[dashed, black] coordinates {(2.75,0) (2.75,1)} node[below left]{\footnotesize $x_i$};
+            
+            \addplot[dashed, black] coordinates {(3.5,0) (3.5,1)} node[below left]{\footnotesize $x_{i+1}$};
+        \end{axis}
+    \end{tikzpicture}
+\end{figure}
 
 \noindent
 Then the integral approximation to $f$ on $D$ is given by
@@ -361,10 +389,265 @@ We'll start with the first scenario below, and then take a look at using Green's
 
 \subsubsection{The 1D Case}
 
+In the case of a 1-dimensional function, suppose we have a partition where the intersection $I_{n-1} = [x_{n-1},x_n]$ and $D_b = [0, r+b/2]$ is non-empty, but for which $I_{n-1} \cap D_b \subsetneq I_{n-1}$. Furthermore, let
 
-\subsection{The 2D Case}
+\[
+    t = \frac{r + b/2 - x_{n-1}}{\Delta x_{n-1}}
+\]
 
-For a sufficiently smooth vector field $\mathbf{F} = \langle F_1, F_2 \rangle$ and bounded region $A \subset \mathbb{R}^2$ with a boundary $C$ forming a simple closed loop, we have that
+\noindent
+Then the exact area of the triangular sliver on $[x_{n-1}, r+b/2]$ is given by
+
+\[
+\begin{array}{rcl}
+    A_{n-1} &=& \displaystyle
+                \frac{1}{2}
+                t \Delta x_{n-1}
+                \left(
+                    \frac{r + b/2 - x_{n-1}}{b}
+                \right)
+                \\
+            & &	\\
+            &=& \displaystyle
+                \frac{1}{2b}
+                t^2 \Delta x_{n-1}^2
+                \\
+\end{array}
+\]
+
+\noindent
+The approximation using the midpoint rule on $I_{n-1}$ is as follows:
+
+\[
+\begin{array}{rcl}
+    M_{n-1} &=& \displaystyle
+                \Delta x_{n-1}
+                \frac{r + \frac{b}{2} - \frac{x_{n-1} + x_n}{2}}{b}
+                \\
+            & &	\\
+            &=& \displaystyle
+                \frac{1}{2b}
+                \Delta x_{n-1}
+                \left(
+                2r + b - x_{n-1} - x_n
+                \right)
+                \\
+            & &	\\
+            &=& \displaystyle
+                \frac{1}{2b}
+                \Delta x_{n-1}
+                \left(
+                r + \frac{b}{2} - x_{n-1}
+                +
+                r + \frac{b}{2} - x_n
+                \right)
+                \\
+            & &	\\
+            &=& \displaystyle
+                \frac{1}{2b}
+                \Delta x_{n-1}
+                \left(
+                    r + \frac{b}{2} - x_{n-1}
+                    -
+                    \left(
+                        x_n
+                        -
+                        \left(
+                            r + \frac{b}{2}
+                        \right)
+                    \right)
+                \right)
+                \\
+            & &	\\
+            &=& \displaystyle
+                \frac{1}{2b}
+                \Delta x_{n-1}
+                (
+                    t \Delta x_{n-1}
+                    -
+                    (1 - t) \Delta x_{n-1}
+                )
+                \\
+            & &	\\
+            &=& \displaystyle
+                \frac{1}{2b}
+                (2t - 1)\Delta x_{n-1}^2
+                \\
+\end{array}
+\]
+
+\noindent
+provided
+
+\[
+    \frac{x_{n-1} + x_n}{2} \leq r + \frac{b}{2}
+    \iff
+    \frac{x_n - x_{n-1}}{2} \leq r + \frac{b}{2} - x_{n-1}
+    \iff
+    \frac{\Delta x_{n-1}}{2} \leq t \Delta x_{n-1}
+    \iff
+    t \geq \frac{1}{2}.
+\]
+
+\noindent
+In the case that $0 < t < \frac{1}{2}$ or $frac{x_{n-1} + x_n}{2} > r + \frac{b}{2}$, the integrand $\omega_b(x) = 0$ at midpoint sampled in $I_{n-1}$, and so $M_{n-1} = 0$. Altogether, we see that
+
+\[
+    M_{n-1}
+    =
+    \begin{cases}
+        0, & 0 < t < \dfrac{1}{2}
+        \\
+        \\
+        \dfrac{1}{2b}
+        (2t - 1)
+        \Delta x_{n-1}^2, & \dfrac{1}{2} \leq t < 1
+    \end{cases}
+\]
+
+\noindent
+with the error given by
+\[
+    E_{n-1}
+    =
+    \begin{cases}
+        \dfrac{1}{2b}
+        t^2
+        \Delta x_{n-1}^2, & 0 < t < \dfrac{1}{2}
+        \\
+        \\
+        \dfrac{1}{2b}
+        (1 - t)^2
+        \Delta x_{n-1}^2, & \dfrac{1}{2} \leq t < 1
+    \end{cases}
+\]
+
+\subsection{Collecting Error Terms}
+
+For the partition $P$, we have that the total nonzero errors can be collected as $E_P = E_j + E_{n-1}$:
+
+\[
+    E_P
+    =
+    \begin{cases}
+        \dfrac{1}{2b}
+        t^2
+        \Delta x_{n-1}^2
+        -
+        \dfrac{1}{2b}
+        s^2 \Delta x_j^2, & 0 < s < \dfrac{1}{2}, \: 0 < t < \dfrac{1}{2}
+        \\
+        \\
+        \dfrac{1}{2b}
+        t^2
+        \Delta x_{n-1}^2
+        -
+        \dfrac{1}{2b}
+        (1-s)^2 \Delta x_j^2, & \dfrac{1}{2} \leq s < 1, \: 0 < t < \dfrac{1}{2}
+        \\
+        \\
+        \dfrac{1}{2b}
+        (1 - t)^2
+        \Delta x_{n-1}^2
+        -
+        \dfrac{1}{2b}
+        s^2 \Delta x_j^2, & 0 < s < \dfrac{1}{2}, \: \dfrac{1}{2} \leq t < 1
+        \\
+        \\
+        \dfrac{1}{2b}
+        (1 - t)^2
+        \Delta x_{n-1}^2
+        -
+        \dfrac{1}{2b}
+        (1-s)^2 \Delta x_j^2, & \dfrac{1}{2} \leq s < 1, \: \dfrac{1}{2} \leq t < 1
+    \end{cases}
+\]
+
+\noindent
+In the 2D case, we typically take the partition to be uniform, and we can assume that to be the case here. This means $\Delta x_i = h_P > 0$ for all $i = 0, 1, \ldots, n-1$. Thus
+
+\[
+E_P
+=
+\begin{cases}
+    \dfrac{1}{2b}
+    (t^2 - s^2)
+    h_P^2, & 0 < s < \dfrac{1}{2}, \: 0 < t < \dfrac{1}{2}
+    \\
+    \\
+    \dfrac{1}{2b}
+    (t^2 - (1 - s)^2)
+    h_P^2, & \dfrac{1}{2} \leq s < 1, \: 0 < t < \dfrac{1}{2}
+    \\
+    \\
+    \dfrac{1}{2b}
+    ((1 - t)^2 - s^2)
+    h_P^2, & 0 < s < \dfrac{1}{2}, \: \dfrac{1}{2} \leq t < 1
+    \\
+    \\
+    \dfrac{1}{2b}
+    ((1 - t)^2 - (1 - s)^2)
+    h_P^2, & \dfrac{1}{2} \leq s < 1, \: \dfrac{1}{2} \leq t < 1
+\end{cases}
+\]
+
+\noindent
+Going further, we can plot $E_P$ as a function of $(s,t)$ on the unit square $[0,1]^2 \subset \mathbb{R}^2$, see Figure ~\ref{fig:midpterr}.
+
+\newpage
+
+\begin{figure}[h]
+    \centering
+    \begin{tikzpicture}
+        \begin{axis}[colorbar, colormap/summer, xlabel=$s$,
+            ylabel=$t$, zlabel=$E_P$, title=Midpoint Error]
+            \addplot3 [
+                surf,
+                %shader=flat,
+                samples=40,
+                faceted color=black,
+                domain=0:1,
+                y domain=0:1
+            ] {(y^2 - x^2) * and(x < 0.5, y < 0.5)
+               +
+               (y^2 - (1-x)^2) * and(x >= 0.5, y < 0.5)
+               +
+               ((1-y)^2 - x^2) * and(x < 0.5, y >= 0.5)
+               +
+               ((1-y)^2 - (1-x)^2) * and(x >= 0.5, y >= 0.5)};
+        \end{axis}
+    \end{tikzpicture}
+    \label{fig:midpterr}
+    \caption{Midpoint error function with $h_P = 1$ and $b = 1/2$.}
+\end{figure}
+
+\noindent
+We see that the magnitude of the error is largest when $s = 0.5$ and $t = 0,1$. In practice, this occurs when the midpoint of interval $I_j$ in the partition $P$ is equal to the coordinate of the discontinuity in the derivative of $\omega_b(x)$. Note that $t = 0$ corresponds to $x_{n-1} = r + b/2$, while $t = 1$ corresponds with $x_n = r + b/2$; the former scenario can be reconfigured such that $x_{n-1}$ is the last point of the partition and assigning $n := n - 1$. The latter scenario occurs when the partition evenly divides the support of $\omega_b(x)$.
+\\
+\\
+Two more critical points are located at $s = 0,1$ and $t = 0.5$. This corresponds to the scenario when the midpoint equals the right endpoint of the support of $\omega_b(x)$, namely $\frac{x_{n-1} + x_n}{2} = r + \frac{b}{2}$. When $s = 0$, this corresponds to $x_j$ coinciding with $x = r - b/2$; similarly, $s = 1$ corresponds to $x_{j+1}$ coinciding with $x = r - b/2$. In either case, the discontinuity is at the boundary of adjacent intervals $I_j$ and $I_{j+1}$, so the integral of $\omega_b(x)$ in this region is exact.
+\\
+\\
+Assuming a uniform step size $h_P$ for the partition $P$, the largest value of the error $E_P$ in magnitude is
+\[
+    |E_P| \leq \frac{1}{8b}h_P^2
+\]
+
+\noindent
+For a partition $Q$ which is a uniform refinement of $P$, i.e.
+$h_Q = h_P / 2$, we have that
+\[
+    |E_Q| \leq \frac{1}{8b}h_Q^2 = \frac{1}{2} \cdot \frac{1}{8b} h_P^2 = \frac{1}{2}|E_P|,
+\]
+
+\noindent
+Indicating that the error reduction rate for a uniform refinement is 1/2, provided $b$ is \textit{bounded away} from the mesh size of any given partition. In practice, we would anticipate $h_P << b$ for some partition $P$.
+
+\newpage
+
+\section{The 2D Case}
+
+For a sufficiently smooth vector field $\mathbf{F} = \langle F_1, F_2 \rangle$ and bounded region $A \subset \mathbb{R}^2$ with a boundary $C$ parameterized by the vector function $\mathbf{r}(t)$ forming a simple closed loop, we have that
 
 \[
     \begin{array}{rcl}
@@ -377,7 +660,7 @@ For a sufficiently smooth vector field $\mathbf{F} = \langle F_1, F_2 \rangle$ a
     \right) \: dA
     &=&
     \displaystyle 
-    \int_C \mathbf{F} \cdot d\mathbf{s} \\
+    \int_C \mathbf{F} \cdot d\mathbf{r} \\
     & & \\
     &=&
     \displaystyle
@@ -389,7 +672,7 @@ For a sufficiently smooth vector field $\mathbf{F} = \langle F_1, F_2 \rangle$ a
 \]
 
 \noindent
-for some (possibly piecewise) parameterization of the curve $C$. In practice, we need to compute three quantities: The area of $A$ and the centroid coordinates $\bar{x}$ and $\bar{y}$ via
+for $C = \partial A$, where the above is the result of Green's Theorem. In practice, we need to compute three quantities: The area of $A$ and the centroid coordinates $\bar{x}$ and $\bar{y}$ via
 
 \[
 \begin{array}{rcl}
@@ -417,16 +700,45 @@ For each of these computations, we will use the following respective vector fiel
     \bar{x} &\rightarrow&	\displaystyle
                             \mathbf{F} =
                             \left\langle
-                                0, \frac{x^2}{2}
+                                0, xy
                             \right\rangle \\
             & & \\
     \bar{y} &\rightarrow&	\displaystyle
                             \mathbf{F} =
                             \left\langle
-                                -\frac{y^2}{2}, 0
+                                -xy, 0
                             \right\rangle \\
 \end{array}
 \]
+
+\noindent
+The regions with which we work are bounded by linear parametric curves of the form
+\[
+    \begin{array}{rcl}
+        r_x(t)	&=&	\displaystyle
+                    \langle
+                        x_0 (1 - t) + x_1t, y_0
+                    \rangle, \:
+                    t \in [0,1]
+                    \\
+                & &	\\
+        r_y(t)	&=&	\displaystyle
+                    \langle
+                        x_0, y_0 (1 - t) + y_1t
+                    \rangle, \:
+                    t \in [0,1]
+                    \\
+                & &	\\
+        r_c(t)	&=&	\displaystyle
+                    \langle
+                        r_a \cos t, r_a \sin t
+                    \rangle, \: r_a > 0, t \in [0, 2\pi) \\
+                & &	\\
+    \end{array}
+\]
+
+\noindent
+The types of functions describing the boundaries of a region where a cell overlaps with the computational domain informs our choices for $\mathbf{F}$: We want to make computing as easy as possible by relying on known, closed-form evaluations of integrals or by canceling terms to reduce what we need to compute. This is particularly useful for eliminating linear portions of the contour integral or enabling us to use substitution to compute the trigonometric portions of the contour integrals.
 
 \newpage
 
