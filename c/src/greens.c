@@ -1,14 +1,17 @@
 #define CORNERS_MASK 0x0000ff
 #define CORNERS_BIT(i) (((int)1) << i)
-#define CORNERS_NIBBLE(n) ((n) & CORNERS_MASK)
+#define GET_CORNERS_NIBBLE(n) ((n) & CORNERS_MASK)
+#define SET_CORNERS_NIBBLE(n, bits) ((n) |= bits)
 
 #define EDGES_MASK 0x00ff00
 #define EDGES_BIT(i) (((int)1) << (i + 4))
-#define EDGES_NIBBLE(n) ((n) & EDGES_MASK)
+#define GET_EDGES_NIBBLE(n) (((n) & EDGES_MASK) >> 4)
+#define SET_EDGES_NIBBLE(n, bits) ((n) |= ((bits) << 4))
 
 #define QUADRANTS_MASK 0xff0000
 #define QUADRANTS_BIT(i) (((int)1) << (i + 8))
-#define QUADRANTS_NIBBLE(n) ((n) & QUADRANTS_MASK)
+#define GET_QUADRANTS_NIBBLE(n) (((n) & QUADRANTS_MASK) >> 8)
+#define SET_QUADRANTS_NIBBLE(n, bits) ((n) |= ((bits) << 8))
 
 #define NIBBLE_SUM(n, mask) ( \
     (((n & mask) >> 0) & 1) + \
@@ -60,9 +63,16 @@ int set_corner_bits(float x0, float x1, float y0, float y1, float xc, float yc, 
 
 int set_edge_bits(float x0, float x1, float y0, float y1, float xc, float yc, float r)
 {
+    int bits = 0;
+    int intersects_edge;
+
     // Determine which of the edges overlaps with the circle.
     int curr, next;
-    float xa, ya;
+    float x2, y2;
+    float x02 = x0*x0;
+    float x12 = x1*x1;
+    float y02 = y0*y0;
+    float y12 = y1*y1;
 
     float d[4] = {
         x0mc*x0mc + y0mc*y0mc,
@@ -70,46 +80,38 @@ int set_edge_bits(float x0, float x1, float y0, float y1, float xc, float yc, fl
         x1mc*x1mc + y1mc*y1mc,
         x0mc*x0mc + y1mc*y1mc
     };
- 
-    for (int i = 0; i < 4; i++) {
-        curr = i;
-        next = (i + 1) % 4;
 
-        if (d[curr] >= r2) {
-            
+    float r2 = r*r;
+
+    float minl = d[0] < d[1] ? d[0] : d[1];
+    float minr = d[2] < d[3] ? d[2] : d[3];
+    float mind = minl < minr ? minl : minr;
+
+    if (mind >= r2) {
+        return bits;
+    }
+
+    for (int i = 0; i < 4; i++) {
+        switch (i) {
+            case 0:
+                x2 = r2 - y0*y0; 
+                intersects_edge = x0*x0 < x2 && x2 < x1*x1;
+                break;
+            case 1:
+                y2 = r2 - x1*x1; 
+                intersects_edge = y0*y0 < y2 && y2 < y1*y1;
+                break;
+            case 2:
+                x2 = r2 - y1*y1; 
+                intersects_edge = x0*x0 < x2 && x2 < x1*x1;
+                break;
+            case 3:
+                y2 = r2 - x0*x0; 
+                intersects_edge = y0*y0 < y2 && y2 < y1*y1;
         }
 
-        if (d[curr] <= r2 && d[next] >= r2) {
-            switch (i) {
-                case 0:
-                    xa = r2 - y0*y0; 
-
-                    if (xa > x0*x0 && xa <= x1*x1) {
-                        cbits |= EDGES_BIT(i);
-                    }
-                    break;
-                case 1:
-                    ya = r2 - x1*x1; 
-
-                    if (ya > y0*y0 && ya <= y1*y1) {
-                        cbits |= EDGES_BIT(i);
-                    }
-                    break;
-                case 2:
-                    xa = r2 - y1*y1; 
-
-                    if (xa >= x0*x0 && xa < x1*x1) {
-                        cbits |= EDGES_BIT(i);
-                    }
-                    break;
-                case 3:
-                    ya = r2 - x1*x1; 
-
-                    if (ya >= y0*y0 && ya < y1*y1) {
-                        cbits |= EDGES_BIT(i);
-                    }
-                    break;
-            }
+        if (intersects_edge) { 
+            bits |= EDGES_BIT(i);
         }
     }
 
@@ -185,38 +187,8 @@ int set_quadrant_bits(float x0, float x1, float y0, float y1, float xc, float yc
 float fgreens(float x0, float x1, float y0, float y1, float xc, float yc, float r)
 {
     float area = 0;
+
+    int cbits = 
     
-    if (cbits) {
-        int quadrant = QUADRANTS_NIBBLE(cbits, QUADRANTS_MASK);
-
-        switch (quadrant) {
-            case QUADRANT1:
-                float xa, xb;
-                float ya, yb;
-
-                float ta = acosf(y0 / r);
-                float tb = asinf(x0 / r);
-
-                xa = r * cosf(ta);
-                ya = r * sinf(ta);
-                xb = r * cosf(tb);
-                yb = r * sinf(tb);
-
-                area = 0.5 * r * r * (tb - ta)
-                     + 0.5 * x0 * (yb - y0)
-                     - 0.5 * y0 * (xb - x0);
-            break;
-
-            case QUADRANT2:
-            break;
-
-            case QUADRANT3:
-            break;
-
-            case QUADRANT4:
-            break;
-        }
-    }
-
     return area;
 }
