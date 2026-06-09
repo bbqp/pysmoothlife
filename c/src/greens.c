@@ -34,9 +34,15 @@ enum quadrant {
 
 enum point_type
 {
-    PTYPE_INTERIOR = -1,
-    PTYPE_BOUNDARY,
-    PTYPE_EXTERIOR
+    PTYPE_INTERIOR = 1,
+    PTYPE_BOUNDARY = 2,
+    PTYPE_EXTERIOR = 4
+};
+
+enum segment_type
+{
+    STYPE_LINE = 1,
+    STYPE_CIRCLE = 2
 };
 
 struct point_s
@@ -44,6 +50,12 @@ struct point_s
     float t;
     float x, y;
     enum point_type type;
+};
+
+struct segment_s
+{
+    struct point_s start, end;
+    enum segment_type type;
 };
 
 int overlap_contains_corners(unsigned cbits)
@@ -216,55 +228,41 @@ int get_quadrant(float x, float y)
     return quadrant;
 }
 
-
 // Prune the queue of exterior points.
-void prune_point_queue(struct point_s *pqueue, int *head, int *tail)
+void points_to_segments(struct segment_s *squeue, int *shead, int *stail, const struct point_s *pqueue, int head, int tail)
 {
-    int start = *head;
-    int end = *tail;    
-    int length = end - start + 1;
+    *shead = 0;
+    *stail = 0;
 
-    while (pqueue[start].type == PTYPE_EXTERIOR && start <= end) {
-        start++;
-        length--;
-    }
+    int cidx = head;
+    int nidx = head + 1;
 
-    if (start <= end) {
-        // Move everything between start and end to the beginning.
-        memmove(pqueue, pqueue + start, length * sizeof(struct pqueue));
+    while (cidx != tail) {
+        curr = pqueue[cidx];
+        next = pqueue[nidx];
 
-        int i, j;
-        struct point_s temp;
-
-        for (i = start + 1; i <= end; i++) {
-            // S
-            if (pqueue[start].type == PTYPE_EXTERIOR) {
-                for (j = i + 1; j <= end; j++) {
-                    if (pqueue[j].type = PTYPE_EXTERIOR) {
-                        temp = pqueue[i];
-                        pqueue[i] = pqueue[j];
-                        pqueue[j] = temp;
-
-                        length--;
-                        break;                       
-                    }
-                }
+        if (curr.type = PTYPE_EXTERIOR) {
+            cidx++;
+        } else {
+            // Loop to the next interior point.
+            while (next.type == PTYPE_EXTERIOR && nidx) {
+                nidx = (nidx + 1) % capacity;
+                next = pqueue[nidx];
             }
+
+            // 
+
+            cidx = nidx;
+            nidx++;
         }
 
-        end = start + length - 1;
     }
 
-    *head = start;
-    *tail = end;
 }
 
-// For now, we'll assume that sqrt((x1-x0)**2 + (y1-y0)*2) <= 2*r
-// This means that if all points in a square are exterior points, then
-// the entire square has to be outside of the circle.
-float fgreens(float x0, float x1, float y0, float y1, float xc, float yc, float r)
+void add_points_to_queue(struct point_s *pqueue, int *qhead, int *qtail, int capacity, float x0, float x1, float y0, float y1, float xc, float yc, float r)
 {
-    float area = 0;
+    float area;
     int cbits = set_corner_bits(x0, x1, y0, y1, xc, yc, r); 
     int ebits = set_edge_bits(x0, x1, y0, y1, xc, yc, r); 
     int qbits = set_quadrant_bits(x0, x1, y0, y1, xc, yc, r);
@@ -314,7 +312,7 @@ float fgreens(float x0, float x1, float y0, float y1, float xc, float yc, float 
     }
 
     // Next, find the intersections along the bottom face.
-    xa[0] = -sqrt(r2 - y0*y0);
+    xa[0] = -sqrtf(r2 - y0*y0);
     xa[1] = -xa[0];
     ya[0] = ya[1] = y0;
 
@@ -345,7 +343,7 @@ float fgreens(float x0, float x1, float y0, float y1, float xc, float yc, float 
 
     // Next, find the intersections along the right face.
     xa[0] = xa[1] = x1;
-    ya[0] = -sqrt(r2 - x1*x1);
+    ya[0] = -sqrtf(r2 - x1*x1);
     ya[1] = -ya[0];
 
     for (int i = 0; i < 2; i++) {
@@ -374,7 +372,7 @@ float fgreens(float x0, float x1, float y0, float y1, float xc, float yc, float 
     }
 
     // Next, find the intersections along the bottom face.
-    xa[0] = sqrt(r2 - y1*y1);
+    xa[0] = sqrtf(r2 - y1*y1);
     xa[1] = -xa[0];
     ya[0] = ya[1] = y1;
 
@@ -405,7 +403,7 @@ float fgreens(float x0, float x1, float y0, float y1, float xc, float yc, float 
 
     // Next, find the intersections along the right face.
     xa[0] = xa[1] = x0;
-    ya[0] = sqrt(r2 - x0*x0);
+    ya[0] = sqrtf(r2 - x0*x0);
     ya[1] = -ya[0];
 
     for (int i = 1; i >= 0; i--) {
@@ -421,8 +419,84 @@ float fgreens(float x0, float x1, float y0, float y1, float xc, float yc, float 
     // Add the first point to the end.
     pqueue[++tail] = (struct point_s)pqueue[0];
 
-    // Prune the queue.
-    prune_point_queue(pqueue, &head, &tail);
+    // Set the head and tail of the queue.
+    *qhead = head;
+    *qtail = tail;
+}
+
+// Assumes a nontrivial intersection of the circular region with the box [x0,x1] x [y0, y1].
+void compute_contour_integrals(struct point_s *pqueue, int head, int tail, float x0, float x1, float y0, float y1, float xc, float yc, float r)
+{
+    // Compute the contributions to the sum using green's theorem.
+    struct point_s curr, next;
+    float curve_sum = 0;
+    float area = 0;
+    int cidx = 0, nidx = 0;
+
+    while (head <= tail) {
+        // Set the boundary integral for the curve/segment to be zero.
+        curve_sum = 0;
+
+        // Move the current index to the first non-exterior point.
+        while (cidx <= tail && pqueue[cidx].type != PTYPE_EXTERIOR) {
+            cidx++;
+        }
+
+        nidx = cidx + 1;
+        while (nidx <= tail && pqueue[nidx] != PTYPE_EXTERIOR) {
+            nidx++;
+        }
+
+        if (curr.type == PTYPE_INTERIOR) {
+            if (curr.y == next.y) {
+                curve_sum = -0.5 * curr.y * (next.x - curr.x);
+            } else if (curr.x == next.x) {
+                curve_sum = 0.5 * curr.x * (next.y - curr.y);
+            }               
+        } else if (curr.type == PTYPE_BOUNDARY) {
+            if (next.type == PTYPE_INTERIOR) {
+                if (curr.y == next.y) {
+                    curve_sum = -0.5 * curr.y * (next.x - curr.x);
+                } else if (curr.x == next.x) {
+                    curve_sum = 0.5 * curr.x * (next.y - curr.y);
+                }                
+            } else if (next.type == PTYPE_BOUNDARY) {
+                // If the boundary curve (circle) is inside of the rectangle,
+                // use Green's theorem for that curve. Otherwise, use the value
+                // of the contour integral for the line.
+                int inside = 1 / tanf(curr.t) > 0 && (1 / tanf(next.t) > 0)
+
+                curve_sum = 0.5 * r * r * (next.t - curr.t);
+            }
+        }
+
+        // Add the contribution to the area.
+        area += curve_sum;
+
+        head++;
+    }
+
+    return area;
+}
+
+
+// For now, we'll assume that sqrt((x1-x0)**2 + (y1-y0)*2) <= 2*r
+// This means that if all points in a square are exterior points, then
+// the entire square has to be outside of the circle.
+float fgreens(float x0, float x1, float y0, float y1, float xc, float yc, float r)
+{
+    float area;
+    int cbits = set_corner_bits(x0, x1, y0, y1, xc, yc, r); 
+    int ebits = set_edge_bits(x0, x1, y0, y1, xc, yc, r); 
+    int qbits = set_quadrant_bits(x0, x1, y0, y1, xc, yc, r);
+    int bits = cbits | ebits | qbits;
+
+    int head = 0, tail = 0;
+    int capacity = 12;
+    struct point_s pqueue[12];
+ 
+    // Add points to the queue.
+    add_points_to_queue(pqueue, &head, &tail, capacity, x0, x1, y0, y1, xc, yc, r);
 
     // Compute the contributions to the sum using green's theorem.
     struct point_s curr, next;
