@@ -305,6 +305,7 @@ void add_points_to_queue(struct point_s *pqueue, int *qhead, int *qtail, int cap
 
     if (lsq < r2) {
         pqueue[tail].type = PTYPE_INTERIOR;
+        pqueue[tail].t = 0;
     } else (lsq > r2) {
         pqueue[tail].type = PTYPE_EXTERIOR;
     } else if (absdiff <= 10 * FLT_EPSILON) {
@@ -422,6 +423,19 @@ void add_points_to_queue(struct point_s *pqueue, int *qhead, int *qtail, int cap
     // Set the head and tail of the queue.
     *qhead = head;
     *qtail = tail;
+}
+
+void construct_segment_queue(struct segment_s *squeue, int *shead, int *stail, struct point_s *pqueue, int qhead, int qtail)
+{
+    int i = 0;
+
+    while (pqueue[i].type == PTYPE_EXTERIOR && i <= qtail) {
+        i++;
+    }
+
+    if (i < qtail) {
+        
+    }
 }
 
 // Assumes a nontrivial intersection of the circular region with the box [x0,x1] x [y0, y1].
