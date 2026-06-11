@@ -163,7 +163,7 @@ def convert_pointer_to_array(ptr, dtype, size):
     return np.fromiter(iter=ptr, dtype=dtype, count=size)
 
 if __name__ == '__main__':
-    np.set_printoptions(linewidth=200)
+    np.set_printoptions(linewidth=300)
     libpath = '../c/lib/' + 'libsmoothlife.so'
     slib = ctypes.cdll.LoadLibrary(libpath)
 
@@ -183,15 +183,22 @@ if __name__ == '__main__':
     b = ctypes.c_float(0.25 * (ro - ri))
 
     slib.grid_init(ctypes.byref(grid), x0, xn, numx, y0, yn, numy, ri_ratio, b)
+    slib.grid_set_value(ctypes.byref(grid), ctypes.c_float(0.5));
     print_grid(grid)
     
     data = convert_pointer_to_array(grid.data, np.float32, grid.fend)
     weights = convert_pointer_to_array(grid.weights, np.float32, grid.aend)
     
     cweights = np.reshape(weights[:grid.cend], shape=(grid.cdiami, grid.cdiami), order='F')
-    #aweights = np.reshape(weights[grid.astart:grid.astart], shape=(grid.cdiamo, grid.cdiamo), order='F')
-    
+    aweights = np.reshape(weights[grid.astart:grid.aend], shape=(grid.cdiamo, grid.cdiamo), order='F')
+
+    print('Circular Weights:') 
     print(cweights)
-    
+    print()
+
+    print('Annular Weights')
+    print(aweights)
+    print()
+
     slib.grid_clear(ctypes.byref(grid))
     print_grid(grid)
