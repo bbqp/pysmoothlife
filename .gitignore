@@ -7,3 +7,6 @@ bin
 docs/*.aux
 docs/*.log
 docs/*.gz
+
+# Ignore anything precompiled and stored by python.
+__pycache__
