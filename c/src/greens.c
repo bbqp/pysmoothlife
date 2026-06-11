@@ -514,7 +514,9 @@ float fgreens(float x0, float x1, float y0, float y1, float xc, float yc, float 
 
     // Compute the contributions to the sum using green's theorem.
     struct point_s curr, next;
+    int curr_idx, next_idx;
     float curve_sum = 0;
+
 
     while (head <= tail) {
         // Set the boundary integral for the curve/segment to be zero.

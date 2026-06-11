@@ -82,7 +82,7 @@ int grid_init(struct grid_s *grid, float x0, float xn, int numx, float y0, float
 	
 	// Indices for the state function values globally.
 	grid->fstart = grid->aend;
-	grid->fend = grid->fstart + (grid->numx - 1) * (grid->numy - 1);
+	grid->fend = grid->fstart + 2 * (grid->numx - 1) * (grid->numy - 1);
 
 	grid->circle_area = M_PI * grid->ri * grid->ri;
 	grid->annulus_area = M_PI * (grid->ro * grid->ro - grid->ri * grid->ri);
@@ -507,8 +507,9 @@ void grid_set_random(struct grid_s *grid)
 {
 	int k;
 	float *data = grid->data;
+    int fend = grid->fstart + (grid->numx - 1) * (grid->numy - 1);
 
-	for (k = grid->fstart; k < grid->fend; k++) {
+	for (k = grid->fstart; k < fend; k++) {
 		data[k] = (float)rand() / RAND_MAX;
 	}
 }
@@ -517,15 +518,17 @@ void grid_set_value(struct grid_s *grid, float value)
 {
 	int k;
 	float *data = grid->data;
+    int fend = grid->fstart + (grid->numx - 1) * (grid->numy - 1);
 
-	for (k = grid->fstart; k < grid->fend; k++) {
+	for (k = grid->fstart; k < fend; k++) {
 		data[k] = value;
 	}
 }
 
 void grid_set_values(struct grid_s *grid, const float *values, int n)
 {
-	int end = n < (grid->fend - grid->fstart) ? n : grid->fend;
+    int fend = grid->fstart + (grid->numx - 1) * (grid->numy - 1);
+	int end = n < (fend - grid->fstart) ? n : fend;
 	int k;
 	float *data = grid->data;
 	
@@ -600,7 +603,7 @@ int grid_write_state_tofile(struct grid_s *grid, const char *filename)
 {
 	FILE *outfile = NULL;
 	int status = 0;
-	int count = grid->fend - grid->fstart;
+	int count = (grid->numx - 1) * (grid->numy - 1);
 	float *data = grid->data + grid->fstart;
 
 	outfile = fopen(filename, "wb");
@@ -810,6 +813,8 @@ void grid_update_state_function(struct grid_s *grid)
 	int M = grid->numy - 1;
 	int N = grid->numx - 1;
 	float *data = grid->data + grid->fstart;
+    float *scratch = data + M*N;
+    float trval;
 
 	for (j = 0; j < N; j++) {
 		jind = j * M;
@@ -819,10 +824,14 @@ void grid_update_state_function(struct grid_s *grid)
 			
 			grid_compute_integral(grid, 'i', &cint, &cmean);
 			grid_compute_integral(grid, 'o', &aint, &amean);
-			
-			data[jind + i] = tfunc_apply(&grid->tfs, amean, cmean);
+
+            //printf("-D- Before: data[%3d][%3d] = %f\t%f %f %f %f\t", i, j, data[jind + i], cint, cmean, aint, amean);
+			scratch[jind + i] = tfunc_apply(&grid->tfs, amean, cmean);
+            //printf("-D- data[%3d][%3d] = %g\n", i, j, scratch[jind + i]);
 		}
 	}
+
+    memcpy(data, scratch, M*N*sizeof(float));
 }
 
 
@@ -861,7 +870,7 @@ void grid_print(const struct grid_s *grid)
 	printf("astart          = %d\n", grid->astart);
 	printf("aend            = %d\n", grid->aend);
 	printf("fstart          = %d\n", grid->fstart);
-	printf("fend            = %d\n\n", grid->fend);
+	printf("fend            = %d\n\n", grid->fstart + (grid->numx - 1) * (grid->numy - 1));
 	
 	printf("circle_area     = %f\n", grid->circle_area);
 	printf("annulus_area    = %f\n", grid->annulus_area);
