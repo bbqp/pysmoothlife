@@ -71,12 +71,6 @@ struct point_s
     struct point_s *next, *prev;
 };
 
-struct segment_s
-{
-    struct point_s start, end;
-    enum segment_type type;
-};
-
 struct point_list_s
 {
     int length;
@@ -320,46 +314,6 @@ void point_list_clear(struct point_list_s *plist)
 
     plist->head = plist->tail = NULL;
     plist->length = 0;
-}
-
-void get_quadrant_and_axis(float x, float y, int *quadrant, int *axis)
-{
-    int quad = 0;
-    int axis = -1;
-
-    if (x > 0) {
-        if (y > 0) {
-            quad = (1 << 0);
-        } else if (y < 0) {
-            quad = (1 << 3);
-        } else {
-            quad = (1 << 0) | (1 << 3);
-            ax = (1 << 0);
-        }
-    } else if (x < 0) {
-        if (y > 0) {
-            quad = (1 << 1);
-        } else if (y < 0) {
-            quad = (1 << 2);
-        } else {
-            quad = (1 << 1) | (1 << 2);
-            ax = (1 << 2);
-        }
-    } else {
-        if (y > 0) {
-            quad = (1 << 0) | (1 << 1);
-            ax = (1 << 1);
-        } else if (y < 0) {
-            quad = (1 << 2) | (1 << 3);
-            ax = (1 << 3);
-        } else {
-            quad = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3);
-            axis = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3);
-        }
-    }
-
-    *quadrant = quad;
-    *axix = ax;
 }
 
 void point_list_build(struct point_list_s *plist, float x0, float y0, float x1, float y1, float xc, float yc, float r)
