@@ -39,7 +39,6 @@ enum axis {
     AXIS4 = 1,
 };
 
-
 enum point_type
 {
     PTYPE_INTERIOR = 1,
@@ -363,13 +362,6 @@ void get_quadrant_and_axis(float x, float y, int *quadrant, int *axis)
     *axix = ax;
 }
 
-void swap(float *t, int i, int j)
-{
-    float temp = t[i];
-    t[i] = t[j];
-    t[j] = temp;
-}
-
 void point_list_build(struct point_list_s *plist, float x0, float y0, float x1, float y1, float xc, float yc, float r)
 {
     // Mathematical constant pi.
@@ -492,7 +484,7 @@ void point_list_build(struct point_list_s *plist, float x0, float y0, float x1, 
     new_point = point_alloc(0, x1, y0, ptype, ltype, location_index);
     point_list_add(plist, new_point);
 
-    // Now find the intersection points on face 0.
+    // Now find the intersection points on face 1.
     ti[0] = acosf(x1 / r);
     if (ti[0] < f_pi2) {
         ti[1] = t[0];
@@ -532,7 +524,131 @@ void point_list_build(struct point_list_s *plist, float x0, float y0, float x1, 
         }
     }
 
+    //------------------------------------------------------------------------
+    // Add the points from face 2.
+    //------------------------------------------------------------------------
 
+    location_index = 2;
+    mag2 = x1 * x1 + y1 * y1;
+    mag = sqrtf(mag2);
+    absdiff = mag > r ? mag - r : r - mag;
+
+    if (absdiff < ctol) {
+        ptype = PTYPE_BOUNDARY;
+    } else if (mag2 < r2) {
+        ptype = PTYPE_INTERIOR;
+    } else if (mag2 > r2) {
+        ptype = PTYPE_EXTERIOR;
+    }
+
+    ltype = LTYPE_CORNER;
+
+    // Add the corner point.
+    new_point = point_alloc(0, x1, y1, ptype, ltype, location_index);
+    point_list_add(plist, new_point);
+
+    // Now find the intersection points on face 2.
+    ti[0] = asinf(y1 / r);
+    if (ti[0] < 0) {
+        ti[1] = f_2pi + ti[0];
+        ti[0] = f_pi - ti[0];
+    } else {
+        ti[1] = f_pi - ti[0];
+    }
+
+    yi[0] = yi[1] = y1;
+    xi[0] = r * cosf(ti[0]);
+    xi[1] = r * cosf(ti[1]);
+
+    // For now, just set the point type since it's known by construction.
+    // We'll set the location type depending on the proximity to a corner.
+    ptype = PTYPE_BOUNDARY;
+
+    for (int k = 0; k < 2; k++) {
+        if (x0 <= xi[k] && xi[k] <= x1) {
+            new_point = point_alloc(ti[k], xi[k], yi[k], ptype, ltype, location_index);
+
+            // Now check if this point is on a proper face or boundary.
+            float dx = xi[k] - x0;
+            if (dx <= ctol) {
+                new_point->ltype = LTYPE_CORNER;
+                new_point->location_index = location_index;
+            } else {
+                dx = x1 - xi[k];
+
+                if (dx <= ctol) {
+                    new_point->ltype = LTYPE_CORNER;
+                    new_point->location_index = location_index + 1;
+                }
+            }
+
+            // Add the point to the list.
+            point_list_add(plist, new_point);
+        }
+    }
+
+    //------------------------------------------------------------------------
+    // Add the points from face 3.
+    //------------------------------------------------------------------------
+
+    location_index = 3;
+    mag2 = x0 * x0 + y1 * y1;
+    mag = sqrtf(mag2);
+    absdiff = mag > r ? mag - r : r - mag;
+
+    if (absdiff < ctol) {
+        ptype = PTYPE_BOUNDARY;
+    } else if (mag2 < r2) {
+        ptype = PTYPE_INTERIOR;
+    } else if (mag2 > r2) {
+        ptype = PTYPE_EXTERIOR;
+    }
+
+    ltype = LTYPE_CORNER;
+
+    // Add the corner point.
+    new_point = point_alloc(0, x0, y1, ptype, ltype, location_index);
+    point_list_add(plist, new_point);
+
+    // Now find the intersection points on face 1.
+    ti[0] = acosf(x0 / r);
+    if (ti[0] < f_pi2) {
+        ti[1] = t[0];
+        ti[0] = f_2pi - ti[0];
+    } else {
+        ti[1] = f_2pi - ti[0];
+    }
+
+    xi[0] = xi[1] = x0;
+    yi[0] = r * sinf(ti[0]);
+    yi[1] = r * sinf(ti[1]);
+
+    // For now, just set the point type since it's known by construction.
+    // We'll set the location type depending on the proximity to a corner.
+    ptype = PTYPE_BOUNDARY;
+
+    for (int k = 0; k < 2; k++) {
+        if (y0 <= yi[k] && yi[k] <= y1) {
+            new_point = point_alloc(ti[k], xi[k], yi[k], ptype, ltype, location_index);
+
+            // Now check if this point is on a proper face or boundary.
+            float dy = yi[k] - y0;
+            if (dy <= ctol) {
+                new_point->ltype = LTYPE_CORNER;
+                new_point->location_index = location_index;
+            } else {
+                dy = y1 - yi[k];
+
+                if (dy <= ctol) {
+                    new_point->ltype = LTYPE_CORNER;
+                    new_point->location_index = location_index + 1;
+                }
+            }
+
+            // Add the point to the list.
+            point_list_add(plist, new_point);
+        }
+    }
 }
 
 void point_list_prune(struct point_list_s *plist)
