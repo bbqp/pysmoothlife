@@ -32,6 +32,14 @@ enum quadrant {
     QUADRANT4 = 8
 };
 
+enum axis {
+    AXIS1 = 1,
+    AXIS2 = 1,
+    AXIS3 = 1,
+    AXIS4 = 1,
+};
+
+
 enum point_type
 {
     PTYPE_INTERIOR = 1,
@@ -39,8 +47,15 @@ enum point_type
     PTYPE_EXTERIOR = 4
 };
 
+enum location_type
+{
+    LTYPE_CORNER = 1,
+    LTYPE_FACE = 2
+};
+
 enum segment_type
 {
+    STYPE_NONE = 0,
     STYPE_LINE = 1,
     STYPE_CIRCLE = 2
 };
@@ -49,7 +64,12 @@ struct point_s
 {
     float t;
     float x, y;
-    enum point_type type;
+    enum point_type ptype;
+    enum location_type ltype;
+    enum segment_type stype;
+    int location_index;
+
+    struct point_s *next, *prev;
 };
 
 struct segment_s
@@ -58,497 +78,555 @@ struct segment_s
     enum segment_type type;
 };
 
-int overlap_contains_corners(unsigned cbits)
+struct point_list_s
 {
-    return CORNERS_NIBBLE(cbits);
-}
+    int length;
+    struct point_s *head, *tail;
+};
 
-int set_corner_bits(float x0, float x1, float y0, float y1, float xc, float yc, float r)
+struct point_s *point_alloc(float t, float x, float y, enum point_type ptype, enum location_type ltype, int lindex)
 {
-    int bits;
-    float x0mc = x0 - xc;
-    float x1mc = x1 - xc;
-    float y0mc = y0 - yc;
-    float y1mc = y1 - yc;
+    struct point_s *point = NULL;
 
-    float d[4] = {
-        x0mc*x0mc + y0mc*y0mc,
-        x1mc*x1mc + y0mc*y0mc,
-        x1mc*x1mc + y1mc*y1mc,
-        x0mc*x0mc + y1mc*y1mc
-    };
- 
-    int inside = 0;
-    float r2 = r*r;
-    unsigned bits = 0;
+    point = calloc(1, sizeof(struct point_s));
 
-    // Determine which of the corners lie within the circle.
-    for (int i = 0; i < 4; i++) {
-        if (d[i] <= r2) {
-            bits |= CORNERS_BIT(i);
-        }
+    if (point != NULL) {
+        point->t = t;
+        point->x = x;
+        point->y = y;
+        point->ptype = ptype;
+        point->ltype;
+        point->stype = STYPE_NONE;
+        point->location_index = lindex;
+
+        point->prev = point->next = NULL;
     }
 
-    return bits;
+    return point;
 }
 
-int set_edge_bits(float x0, float x1, float y0, float y1, float xc, float yc, float r)
+// Assumes point->next != NULL
+void point_set_segment_type(struct point_s *p1, const struct point_s *p2)
 {
-    int bits = 0;
-    int intersects_edge;
+    point_type p1_ptype = p1->ptype;
+    location_type p1_ltype = p1->ltype;
+    int p1_lindex = p1->location_index;
 
-    // Determine which of the edges overlaps with the circle.
-    int curr, next;
-    float x2, y2;
-    float x02 = x0*x0;
-    float x12 = x1*x1;
-    float y02 = y0*y0;
-    float y12 = y1*y1;
+    point_type p2_ptype = p2->ptype;
+    location_type p2_ltype = p2->ltype;
+    int p2_lindex = p2->location_index;
 
-    float d[4] = {
-        x0mc*x0mc + y0mc*y0mc,
-        x1mc*x1mc + y0mc*y0mc,
-        x1mc*x1mc + y1mc*y1mc,
-        x0mc*x0mc + y1mc*y1mc
-    };
-
-    float r2 = r*r;
-
-    float minl = d[0] < d[1] ? d[0] : d[1];
-    float minr = d[2] < d[3] ? d[2] : d[3];
-    float mind = minl < minr ? minl : minr;
-
-    if (mind >= r2) {
-        return bits;
-    }
-
-    for (int i = 0; i < 4; i++) {
-        switch (i) {
-            case 0:
-                x2 = r2 - y0*y0; 
-                intersects_edge = x0*x0 < x2 && x2 < x1*x1;
-                break;
-            case 1:
-                y2 = r2 - x1*x1; 
-                intersects_edge = y0*y0 < y2 && y2 < y1*y1;
-                break;
-            case 2:
-                x2 = r2 - y1*y1; 
-                intersects_edge = x0*x0 < x2 && x2 < x1*x1;
-                break;
-            case 3:
-                y2 = r2 - x0*x0; 
-                intersects_edge = y0*y0 < y2 && y2 < y1*y1;
-        }
-
-        if (intersects_edge) { 
-            bits |= EDGES_BIT(i);
-        }
-    }
-
-    return bits;
-}
-
-
-int set_quadrant_bits(float x0, float x1, float y0, float y1, float xc, float yc, float r)
-{
-    int bits = 0;
-
-    float x0mc = x0 - xc;
-    float x1mc = x1 - xc;
-    float y0mc = y0 - yc;
-    float y1mc = y1 - yc;
-
-    // Check the quadrants in which the shape is located.
-    if (x0mc >= 0) {
-        if (y0mc >= 0) {
-            bits |= QUADRANT_BIT(0);
+    if (p1->ptype == p2->ptype) {
+        if (p1->ptype == PTYPE_INTERIOR) {
+            p1->stype = STYPE_LINE;
         } else {
-            bits |= QUADRANT_BIT(3);
+            // For boundary points, we need to be more careful. At the given
+            // and next point, we'll use information about the derivative of
+            // the circular countour at the intersection points to determine
+            // if the circular contour is inside the square region or outside
+            // of it. If inside, we integrate along the circular contour.
+            // Otherwise, we integrate across the line segment along a given
+            // face.
+
+            if (p1->location_index == p2->location_index) {
+                // This means both points are on the same face, so we just need
+                // to check if the circle is in or outside of the rectangle. We
+                // can do this by checking how the x-coordinates change going
+                // from point p1 to point p2.
+
+                switch (p1->location_index) {
+                    case 0:
+                        if (p1->x < p2->x) {
+                            p1->stype = STYPE_LINE;
+                        } else {
+                            p1->stype = STYPE_CIRCLE;
+                        }
+
+                        break;
+                    case 1:
+                        if (p1->y < p2->y) {
+                            p1->stype = STYPE_LINE;
+                        } else {
+                            p1->stype = STYPE_CIRCLE;
+                        }
+
+                        break;
+                    case 2:
+                        if (p1->x > p2->x) {
+                            p1->stype = STYPE_LINE;
+                        } else {
+                            p1->stype = STYPE_CIRCLE;
+                        }
+
+                        break;
+                    case 3:
+                        if (p1->y > p2->y) {
+                            p1->stype = STYPE_LINE;
+                        } else {
+                            p1->stype = STYPE_CIRCLE;
+                        }
+                }
+            } else {
+                // In this case, we're not indexed to the same face, but we
+                // could, for example, have intersection points at corners
+                // where the x- or y-coordinates are equal, meaning the
+                // starting and ending points lie on the same horizontal or
+                // vertical surface of the rectangle. Similarly, one point
+                // could cross through a face and another through a corner.
+
+                int adjacent_locations = 0;
+                switch (p1->location_index) {
+                    case 0:
+                        switch (p2->location_index) {
+                            case 1:
+                            case 3:
+                                adjacent_locations = 1;
+                        }
+                        break;
+                  case 1:
+                        switch (p2->location_index) {
+                            case 0:
+                            case 2:
+                                adjacent_locations = 1;
+                        }
+                        break;
+                  case 2:
+                        switch (p2->location_index) {
+                            case 1:
+                            case 3:
+                                adjacent_locations = 1;
+                        }
+                        break;
+                  case 3:
+                        switch (p2->location_index) {
+                            case 0:
+                            case 2:
+                                adjacent_locations = 1;
+                        }
+                }
+
+                if (p1->ltype == LTYPE_FACE && p2->ltype == LTYPE_FACE) {
+                    p1->stype = STYPE_CIRCLE;
+                } else {
+                    int both_corners = p1->ltype == p2->ltype && p1->ltype == LTYPE_CORNER;
+                    int ends_at_corner = both_corners || p2->ltype == LTYPE_CORNER;
+
+                    if (adjacent_locations) {
+                        if (ends_at_corner) {
+                            switch (p1->location_index) {
+                                case 0:
+                                    if (p1->x < p2->x) {
+                                        p1->stype = STYPE_LINE;
+                                    } else {
+                                        p1->stype = STYPE_CIRCLE;
+                                    }
+
+                                    break;
+                                case 1:
+                                    if (p1->y < p2->y) {
+                                        p1->stype = STYPE_LINE;
+                                    } else {
+                                        p1->stype = STYPE_CIRCLE;
+                                    }
+
+                                    break;
+                                case 2:
+                                    if (p1->x > p2->x) {
+                                        p1->stype = STYPE_LINE;
+                                    } else {
+                                        p1->stype = STYPE_CIRCLE;
+                                    }
+
+                                    break;
+                                case 3:
+                                    if (p1->y > p2->y) {
+                                        p1->stype = STYPE_LINE;
+                                    } else {
+                                        p1->stype = STYPE_CIRCLE;
+                                    }
+                            }
+                        } else {
+                            p1->stype = STYPE_CIRCLE;
+                        }
+                    } else {
+                        p1->stype = STYPE_CIRCLE;
+                    }  // else point locations are not on adjacent portions of the boundary.
+                }  // else one or both points are corners
+            }  // else we are not indexed to the same location
+        }  // else we gave two boundary intersection points.
+    } else {
+        p1->stype = STYPE_LINE;
+    }
+}
+
+void point_free(struct point_s *point)
+{
+    free(point);
+}
+
+void point_list_init(struct point_list_s *plist, const struct point_s *head)
+{
+    plist->head = head;
+    plist->length = 1;
+}
+
+int point_list_add(struct point_list_s *plist, const struct point_s *point)
+{
+    plist->tail->next = point;
+    plist->tail = point;
+    plist->length++;
+
+    return plist->length;
+}
+
+int point_list_remove_next(struct point_list_s *plist, struct point_s *point)
+{
+    struct point_s *removed = NULL;
+    int removal_status = 0;
+
+    if (point->next != NULL) {
+        if (point->next != plist->tail) {
+            removed = point->next;
+            removed->next->prev = point;
+            point->next = removed->next;
+            removed->next = removed->prev = NULL;            
+        } else {
+            removed = point->next;
+            point->next = removed->next;
+            removed->prev = NULL; 
         }
 
-        if (y1mc >= 0) {
-            bits |= QUADRANT_BIT(0);
+        free(removed);
+
+        removal_status = plist->length--;
+    }
+
+    return removal_status;
+}
+
+void point_list_clear(struct point_list_s *plist)
+{
+    struct point_s *curr = plist->head;
+
+    while (curr->next != NULL) {
+        plist->head = plist->head->next;
+        curr->prev = curr->next = plist->head->prev = NULL;
+
+        free(curr);
+        curr = plist->head;
+    }
+
+    curr->next = curr->prev = NULL;
+    free(curr);
+
+    plist->head = plist->tail = NULL;
+    plist->length = 0;
+}
+
+void get_quadrant_and_axis(float x, float y, int *quadrant, int *axis)
+{
+    int quad = 0;
+    int axis = -1;
+
+    if (x > 0) {
+        if (y > 0) {
+            quad = (1 << 0);
+        } else if (y < 0) {
+            quad = (1 << 3);
         } else {
-            bits |= QUADRANT_BIT(3);
+            quad = (1 << 0) | (1 << 3);
+            ax = (1 << 0);
+        }
+    } else if (x < 0) {
+        if (y > 0) {
+            quad = (1 << 1);
+        } else if (y < 0) {
+            quad = (1 << 2);
+        } else {
+            quad = (1 << 1) | (1 << 2);
+            ax = (1 << 2);
         }
     } else {
-        if (y0mc >= 0) {
-            bits |= QUADRANT_BIT(1);
+        if (y > 0) {
+            quad = (1 << 0) | (1 << 1);
+            ax = (1 << 1);
+        } else if (y < 0) {
+            quad = (1 << 2) | (1 << 3);
+            ax = (1 << 3);
         } else {
-            bits |= QUADRANT_BIT(2);
-        }
-
-        if (y1mc >= 0) {
-            bits |= QUADRANT_BIT(1);
-        } else {
-            bits |= QUADRANT_BIT(2);
-        }
-    }
-
-    if (x1mc >= 0) {
-        if (y0mc >= 0) {
-            bits |= QUADRANT_BIT(0);
-        } else {
-            bits |= QUADRANT_BIT(3);
-        }
-
-        if (y1mc >= 0) {
-            bits |= QUADRANT_BIT(0);
-        } else {
-            bits |= QUADRANT_BIT(3);
-        }
-    } else {
-        if (y0mc >= 0) {
-            bits |= QUADRANT_BIT(1);
-        } else {
-            bits |= QUADRANT_BIT(2);
-        }
-
-        if (y1mc >= 0) {
-            bits |= QUADRANT_BIT(1);
-        } else {
-            bits |= QUADRANT_BIT(2);
+            quad = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3);
+            axis = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3);
         }
     }
 
-    return bits;
+    *quadrant = quad;
+    *axix = ax;
 }
 
-int get_quadrant(float x, float y)
+void swap(float *t, int i, int j)
 {
-    int quadrant;
-
-    if (x >= 0) {
-        quadrant = y >= 0 ? 0 : 3;
-    } else {
-        quadrant = y >= 0 ? 1 : 2;
-    }
-
-    return quadrant;
+    float temp = t[i];
+    t[i] = t[j];
+    t[j] = temp;
 }
 
-// Prune the queue of exterior points.
-void points_to_segments(struct segment_s *squeue, int *shead, int *stail, const struct point_s *pqueue, int head, int tail)
+void point_list_build(struct point_list_s *plist, float x0, float y0, float x1, float y1, float xc, float yc, float r)
 {
-    *shead = 0;
-    *stail = 0;
+    // Mathematical constant pi.
+    const float f_pi = atan2f(0.0f, -1.0f);
+    const float f_pi2 = f_pi / 2;
+    const float f_2pi = 2 * f_pi;
 
-    int cidx = head;
-    int nidx = head + 1;
+    // Tolerance for corner proximity.
+    const float ctol = 10 * FLT_EPSILON;
 
-    while (cidx != tail) {
-        curr = pqueue[cidx];
-        next = pqueue[nidx];
+    // Intersection points.
+    float ti[2];
+    float xi[2];
+    float yi[2];
 
-        if (curr.type = PTYPE_EXTERIOR) {
-            cidx++;
-        } else {
-            // Loop to the next interior point.
-            while (next.type == PTYPE_EXTERIOR && nidx) {
-                nidx = (nidx + 1) % capacity;
-                next = pqueue[nidx];
+    // Shorthands.
+    float r2 = r * r;
+
+    // Point (vector) length.
+    float mag2;
+    float absdiff;
+
+    // Placeholder struct for new point.
+    struct point_s *new_point = NULL;
+
+    // Placeholders for point and location types.
+    enum point_type ptype;
+    enum location_type ltype;
+    int location_index;
+
+    // Shift the points to the origin.
+    x0 -= xc;
+    y0 -= yc;
+    x1 -= xc;
+    y1 -= yc;
+
+    //------------------------------------------------------------------------
+    // Add the points from face 0.
+    //------------------------------------------------------------------------
+
+    location_index = 0;
+    mag2 = x0 * x0 + y0 * y0;
+    mag = sqrtf(mag2);
+    absdiff = mag > r ? mag - r : r - mag;
+
+    if (absdiff < ctol) {
+        ptype = PTYPE_BOUNDARY;
+    } else if (mag2 < r2) {
+        ptype = PTYPE_INTERIOR;
+    } else if (mag2 > r2) {
+        ptype = PTYPE_EXTERIOR;
+    }
+
+    ltype = LTYPE_CORNER;
+
+    // Add the corner point.
+    new_point = point_alloc(0, x0, y0, ptype, ltype, location_index);
+    point_list_add(plist, new_point);
+
+    // Now find the intersection points on face 0.
+    ti[0] = asinf(y0 / r);
+    if (ti[0] < 0) {
+        ti[1] = f_2pi + ti[0];
+        ti[0] = f_pi - ti[0];
+    } else {
+        ti[1] = f_pi - ti[0];
+    }
+
+    yi[0] = yi[1] = y0;
+    xi[0] = r * cosf(ti[0]);
+    xi[1] = r * cosf(ti[1]);
+
+    // For now, just set the point type since it's known by construction.
+    // We'll set the location type depending on the proximity to a corner.
+    ptype = PTYPE_BOUNDARY;
+
+    for (int k = 0; k < 2; k++) {
+        if (x0 <= xi[k] && xi[k] <= x1) {
+            new_point = point_alloc(ti[k], xi[k], yi[k], ptype, ltype, location_index);
+
+            // Now check if this point is on a proper face or boundary.
+            float dx = xi[k] - x0;
+            if (dx <= ctol) {
+                new_point->ltype = LTYPE_CORNER;
+                new_point->location_index = location_index;
+            } else {
+                dx = x1 - xi[k];
+
+                if (dx <= ctol) {
+                    new_point->ltype = LTYPE_CORNER;
+                    new_point->location_index = location_index + 1;
+                }
             }
 
-            // 
-
-            cidx = nidx;
-            nidx++;
+            // Add the point to the list.
+            point_list_add(plist, new_point);
         }
-
     }
+
+    //------------------------------------------------------------------------
+    // Add the points from face 1.
+    //------------------------------------------------------------------------
+
+    location_index = 1;
+    mag2 = x1 * x1 + y0 * y0;
+    mag = sqrtf(mag2);
+    absdiff = mag > r ? mag - r : r - mag;
+
+    if (absdiff < ctol) {
+        ptype = PTYPE_BOUNDARY;
+    } else if (mag2 < r2) {
+        ptype = PTYPE_INTERIOR;
+    } else if (mag2 > r2) {
+        ptype = PTYPE_EXTERIOR;
+    }
+
+    ltype = LTYPE_CORNER;
+
+    // Add the corner point.
+    new_point = point_alloc(0, x1, y0, ptype, ltype, location_index);
+    point_list_add(plist, new_point);
+
+    // Now find the intersection points on face 0.
+    ti[0] = acosf(x1 / r);
+    if (ti[0] < f_pi2) {
+        ti[1] = t[0];
+        ti[0] = f_2pi - ti[0];
+    } else {
+        ti[1] = f_2pi - ti[0];
+    }
+
+    xi[0] = xi[1] = x1;
+    yi[0] = r * sinf(ti[0]);
+    yi[1] = r * sinf(ti[1]);
+
+    // For now, just set the point type since it's known by construction.
+    // We'll set the location type depending on the proximity to a corner.
+    ptype = PTYPE_BOUNDARY;
+
+    for (int k = 0; k < 2; k++) {
+        if (y0 <= yi[k] && yi[k] <= y1) {
+            new_point = point_alloc(ti[k], xi[k], yi[k], ptype, ltype, location_index);
+
+            // Now check if this point is on a proper face or boundary.
+            float dy = yi[k] - y0;
+            if (dy <= ctol) {
+                new_point->ltype = LTYPE_CORNER;
+                new_point->location_index = location_index;
+            } else {
+                dy = y1 - yi[k];
+
+                if (dy <= ctol) {
+                    new_point->ltype = LTYPE_CORNER;
+                    new_point->location_index = location_index + 1;
+                }
+            }
+
+            // Add the point to the list.
+            point_list_add(plist, new_point);
+        }
+    }
+
 
 }
 
-void add_points_to_queue(struct point_s *pqueue, int *qhead, int *qtail, int capacity, float x0, float x1, float y0, float y1, float xc, float yc, float r)
+void point_list_prune(struct point_list_s *plist)
 {
-    float area;
-    int cbits = set_corner_bits(x0, x1, y0, y1, xc, yc, r); 
-    int ebits = set_edge_bits(x0, x1, y0, y1, xc, yc, r); 
-    int qbits = set_quadrant_bits(x0, x1, y0, y1, xc, yc, r);
-    int bits = cbits | ebits | qbits;
+    struct point_s *curr = plist->head;
 
-    int head = 0, tail = 0;
-    struct point_s pqueue[12];
-    float lsq;
+    while (curr != plist->tail) {
+        if (curr->ptype = PTYPE_EXTERIOR) {
+            before = curr->prev;
+            after = curr->next;
+
+            before->next = curr->next;
+            after->prev = curr->prev;
+
+            curr->prev = curr->next = NULL;
+            free(curr);
+        }
+
+        curr = curr->next;
+    }
+
+    if (curr->ptype == PTYPE_EXTERIOR) {
+        before = curr->prev;
+        before->next = curr->next;
+        plist->tail = before;
+
+        curr->prev = curr->next = NULL;
+        free(curr);
+    }
+}
+
+void point_list_set_segment_types(struct point_list_s *plist)
+{
+    struct point_s *curr = plist->head;
+    struct point_s *next = NULL;
+
+    while (curr != NULL) {
+        next = curr->next != NULL ? curr->next : plist->head;
+        point_set_segment_type(curr, next);
+    }
+}
+
+//
+// void point_list_compute_greens()
+//
+// Uses Green's theorem to compute the area of a region comprising the overlap
+// of a circle of radius r with the rectangle [x0, x1] x [y0, y1].
+void point_list_compute_greens(const struct point_list_s *plist, float r)
+{
+    float contour_sums = 0.0f;
+    struct point_s *curr, *p1, *p2;
     float r2 = r*r;
-    float t[2];
 
-    float x0c = x0 - xc;
-    float y0c = y0 - yc;
-    float x1c = x1 - xc;
-    float y1c = y1 - yc;
-    float d[4] = {
-        x0c*x0c + y0c*y0c,
-        x1c*x1c + y0c*y0c,
-        x0c*x0c + y1c*y1c,
-        x1c*x1c + y1c*y1c,
-    };
+    int start_face;
 
-    int all_interior = d[0] <= r2 && d[1] <= r2 && d[2] <= r2 && d[3] <= r2;
-    int all_exterior = d[0] >= r2 && d[1] >= r2 && d[2] >= r2 && d[3] >= r2;
+    float p1t;
+    float p2t;
 
-    if (all_interior) {
-        return (x1 - x0) * (y1 - y0);
-    }
+    float p1x;
+    float p2x;
 
-    if (all_exterior) {
-        return 0;
-    }
+    float p1y;
+    float p2y;
 
-    // Add the points moving counterclockwise, starting from the lower left corner.
-    pqueue[tail].x = x0;
-    pqueue[tail].y = y0;
+    for (curr = plist->head; curr != NULL; curr = curr->next) {
+        // Grab the points connected by either a line or circular curve.
+        p1 = curr;
+        p2 = curr->next != NULL ? curr->next : plist->head;
 
-    lsq = x0 * x0 + y0 * y0;
-    absdiff = lsq < r2 ? r2 - lsq : lsq - r2;
+        // Extract the coordinates, type, and location of the first point.
+        p1t = p1->t;
+        p1x = p1->x;
+        p1y = p1->y;
 
-    if (lsq < r2) {
-        pqueue[tail].type = PTYPE_INTERIOR;
-        pqueue[tail].t = 0;
-    } else (lsq > r2) {
-        pqueue[tail].type = PTYPE_EXTERIOR;
-    } else if (absdiff <= 10 * FLT_EPSILON) {
-        pqueue[tail].type = PTYPE_BOUNDARY;
-    }
+        // Extract the coordinates, type, and location of the second point.
+        p2t = p2->t;
+        p2x = p2->x;
+        p2y = p2->y;
 
-    // Next, find the intersections along the bottom face.
-    xa[0] = -sqrtf(r2 - y0*y0);
-    xa[1] = -xa[0];
-    ya[0] = ya[1] = y0;
-
-    for (int i = 0; i < 2; i++) {
-        if (x0 <= xa[i] && xa[i] <= x1) {
-            tail++;
-
-            pqueue[tail].x = xa[i];
-            pqueue[tail].y = ya[i];
-            pqueue[tail].type = PTYPE_BOUNDARY;
-        }
-    }
-
-    // Add the next set of points starting from the lower-right corner and along the right face.
-    pqueue[tail].x = x1;
-    pqueue[tail].y = y0;
-
-    lsq = x1 * x1 + y0 * y0;
-    absdiff = lsq < r2 ? r2 - lsq : lsq - r2;
-
-    if (lsq < r2) {
-        pqueue[tail].type = PTYPE_INTERIOR;
-    } else (lsq > r2) {
-        pqueue[tail].type = PTYPE_EXTERIOR;
-    } else if (absdiff <= 10 * FLT_EPSILON) {
-        pqueue[tail].type = PTYPE_BOUNDARY;
-    }
-
-    // Next, find the intersections along the right face.
-    xa[0] = xa[1] = x1;
-    ya[0] = -sqrtf(r2 - x1*x1);
-    ya[1] = -ya[0];
-
-    for (int i = 0; i < 2; i++) {
-        if (y0 <= ya[i] && ya[i] <= y1) {
-            tail++;
-
-            pqueue[tail].x = xa[i];
-            pqueue[tail].y = ya[i];
-            pqueue[tail].type = PTYPE_BOUNDARY;
-        }
-    }
-
-    // Add the next set of points starting from the upper-right corner and along the top face.
-    pqueue[tail].x = x1;
-    pqueue[tail].y = y1;
-
-    lsq = x1 * x1 + y1 * y1;
-    absdiff = lsq < r2 ? r2 - lsq : lsq - r2;
-
-    if (lsq < r2) {
-        pqueue[tail].type = PTYPE_INTERIOR;
-    } else (lsq > r2) {
-        pqueue[tail].type = PTYPE_EXTERIOR;
-    } else if (absdiff <= 10 * FLT_EPSILON) {
-        pqueue[tail].type = PTYPE_BOUNDARY;
-    }
-
-    // Next, find the intersections along the bottom face.
-    xa[0] = sqrtf(r2 - y1*y1);
-    xa[1] = -xa[0];
-    ya[0] = ya[1] = y1;
-
-    for (int i = 1; i >= 0; i--) {
-        if (x0 <= xa[i] && xa[i] <= x1) {
-            tail++;
-
-            pqueue[tail].x = xa[i];
-            pqueue[tail].y = ya[i];
-            pqueue[tail].type = PTYPE_BOUNDARY;
-        }
-    }
-
-    // Add the next set of points starting from the lower-right corner and along the right face.
-    pqueue[tail].x = x0;
-    pqueue[tail].y = y1;
-
-    lsq = x0 * x0 + y0 * y0;
-    absdiff = lsq < r2 ? r2 - lsq : lsq - r2;
-
-    if (lsq < r2) {
-        pqueue[tail].type = PTYPE_INTERIOR;
-    } else (lsq > r2) {
-        pqueue[tail].type = PTYPE_EXTERIOR;
-    } else if (absdiff <= 10 * FLT_EPSILON) {
-        pqueue[tail].type = PTYPE_BOUNDARY;
-    }
-
-    // Next, find the intersections along the right face.
-    xa[0] = xa[1] = x0;
-    ya[0] = sqrtf(r2 - x0*x0);
-    ya[1] = -ya[0];
-
-    for (int i = 1; i >= 0; i--) {
-        if (y0 <= ya[i] && ya[i] <= y1) {
-            tail++;
-
-            pqueue[tail].x = xa[i];
-            pqueue[tail].y = ya[i];
-            pqueue[tail].type = PTYPE_BOUNDARY;
-        }
-    }
-
-    // Add the first point to the end.
-    pqueue[++tail] = (struct point_s)pqueue[0];
-
-    // Set the head and tail of the queue.
-    *qhead = head;
-    *qtail = tail;
-}
-
-void construct_segment_queue(struct segment_s *squeue, int *shead, int *stail, struct point_s *pqueue, int qhead, int qtail)
-{
-    int i = 0;
-
-    while (pqueue[i].type == PTYPE_EXTERIOR && i <= qtail) {
-        i++;
-    }
-
-    if (i < qtail) {
-        
-    }
-}
-
-// Assumes a nontrivial intersection of the circular region with the box [x0,x1] x [y0, y1].
-void compute_contour_integrals(struct point_s *pqueue, int head, int tail, float x0, float x1, float y0, float y1, float xc, float yc, float r)
-{
-    // Compute the contributions to the sum using green's theorem.
-    struct point_s curr, next;
-    float curve_sum = 0;
-    float area = 0;
-    int cidx = 0, nidx = 0;
-
-    while (head <= tail) {
-        // Set the boundary integral for the curve/segment to be zero.
-        curve_sum = 0;
-
-        // Move the current index to the first non-exterior point.
-        while (cidx <= tail && pqueue[cidx].type != PTYPE_EXTERIOR) {
-            cidx++;
-        }
-
-        nidx = cidx + 1;
-        while (nidx <= tail && pqueue[nidx] != PTYPE_EXTERIOR) {
-            nidx++;
-        }
-
-        if (curr.type == PTYPE_INTERIOR) {
-            if (curr.y == next.y) {
-                curve_sum = -0.5 * curr.y * (next.x - curr.x);
-            } else if (curr.x == next.x) {
-                curve_sum = 0.5 * curr.x * (next.y - curr.y);
-            }               
-        } else if (curr.type == PTYPE_BOUNDARY) {
-            if (next.type == PTYPE_INTERIOR) {
-                if (curr.y == next.y) {
-                    curve_sum = -0.5 * curr.y * (next.x - curr.x);
-                } else if (curr.x == next.x) {
-                    curve_sum = 0.5 * curr.x * (next.y - curr.y);
-                }                
-            } else if (next.type == PTYPE_BOUNDARY) {
-                // If the boundary curve (circle) is inside of the rectangle,
-                // use Green's theorem for that curve. Otherwise, use the value
-                // of the contour integral for the line.
-                int inside = 1 / tanf(curr.t) > 0 && (1 / tanf(next.t) > 0)
-
-                curve_sum = 0.5 * r * r * (next.t - curr.t);
+        if (p1->stype == STYPE_CIRCLE) {
+            contour_sums += 0.5 * r2 * (p2t - p1t);
+        } else {
+            switch (p1->location_index) {
+                case 0:
+                case 2:
+                    contour_sums -= 0.5 * p1y * (p2x - p1x);
+                    break;
+                case 1:
+                case 3:
+                    contour_sums += 0.5 * p1x * (p2y - p1y);
             }
         }
-
-        // Add the contribution to the area.
-        area += curve_sum;
-
-        head++;
     }
 
-    return area;
+    return countour_sums;
 }
 
-
-// For now, we'll assume that sqrt((x1-x0)**2 + (y1-y0)*2) <= 2*r
-// This means that if all points in a square are exterior points, then
-// the entire square has to be outside of the circle.
-float fgreens(float x0, float x1, float y0, float y1, float xc, float yc, float r)
-{
-    float area;
-    int cbits = set_corner_bits(x0, x1, y0, y1, xc, yc, r); 
-    int ebits = set_edge_bits(x0, x1, y0, y1, xc, yc, r); 
-    int qbits = set_quadrant_bits(x0, x1, y0, y1, xc, yc, r);
-    int bits = cbits | ebits | qbits;
-
-    int head = 0, tail = 0;
-    int capacity = 12;
-    struct point_s pqueue[12];
- 
-    // Add points to the queue.
-    add_points_to_queue(pqueue, &head, &tail, capacity, x0, x1, y0, y1, xc, yc, r);
-
-    // Compute the contributions to the sum using green's theorem.
-    struct point_s curr, next;
-    int curr_idx, next_idx;
-    float curve_sum = 0;
-
-
-    while (head <= tail) {
-        // Set the boundary integral for the curve/segment to be zero.
-        curve_sum = 0;
-
-        // Get the current and next point.
-        curr = point[head];
-        next = point[head + 1];
-
-        if (curr.type == PTYPE_INTERIOR) {
-            if (curr.y == next.y) {
-                curve_sum = -0.5 * curr.y * (next.x - curr.x);
-            } else if (curr.x == next.x) {
-                curve_sum = 0.5 * curr.x * (next.y - curr.y);
-            }               
-        } else if (curr.type == PTYPE_BOUNDARY) {
-            if (next.type == PTYPE_INTERIOR) {
-                if (curr.y == next.y) {
-                    curve_sum = -0.5 * curr.y * (next.x - curr.x);
-                } else if (curr.x == next.x) {
-                    curve_sum = 0.5 * curr.x * (next.y - curr.y);
-                }                
-            } else if (next.type == PTYPE_BOUNDARY) {
-                curve_sum = 0.5 * r * r * (next.t - curr.t);
-            }
-        }
-
-        // Add the contribution to the area.
-        area += curve_sum;
-
-        head++;
-    }
-
-    return area;
-}
