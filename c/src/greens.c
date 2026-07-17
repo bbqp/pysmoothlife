@@ -1,43 +1,6 @@
-#define CORNERS_MASK 0x0000ff
-#define SET_CORNERS_BIT(bits, i) ((bits) |= (((int)1) << (i)))
-#define GET_CORNERS_BIT(i) (((bits) >> (i)) & ((int)1))
-#define GET_CORNERS_NIBBLE(n) ((n) & CORNERS_MASK)
-#define SET_CORNERS_NIBBLE(n, bits) ((n) |= (bits))
+#include "greens.h"
+#include <math.h>
 
-#define EDGES_MASK 0x00ff00
-#define SET_EDGES_BIT(i) ((bits) |= (((int)1) << ((i) + 4))
-#define GET_EDGES_BIT(i) (((bits) >> ((i) + 4)) & ((int)1))
-#define GET_EDGES_NIBBLE(n) (((n) & EDGES_MASK) >> 4)
-#define SET_EDGES_NIBBLE(n, bits) ((n) |= ((bits) << 4))
-
-#define QUADRANTS_MASK 0xff0000
-#define SET_QUADRANTS_BIT(i) ((bits) |= (((int)1) << ((i) + 8))
-#define GET_QUADRANTS_BIT(i) (((bits) >> ((i) + 8)) & ((int)1))
-#define GET_QUADRANTS_NIBBLE(n) (((n) & QUADRANTS_MASK) >> 8)
-#define SET_QUADRANTS_NIBBLE(n, bits) ((n) |= ((bits) << 8))
-
-#define F_PI atan2f(0.0f, -1.0f)
-
-#define NIBBLE_SUM(n, mask) ( \
-    (((n & mask) >> 0) & 1) + \
-    (((n & mask) >> 1) & 1) + \
-    (((n & mask) >> 2) & 1) + \
-    (((n & mask) >> 3) & 1) \
-)
-
-enum quadrant {
-    QUADRANT1 = 1,
-    QUADRANT2 = 2,
-    QUADRANT3 = 4,
-    QUADRANT4 = 8
-};
-
-enum axis {
-    AXIS1 = 1,
-    AXIS2 = 1,
-    AXIS3 = 1,
-    AXIS4 = 1,
-};
 
 enum point_type
 {
